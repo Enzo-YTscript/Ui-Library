@@ -832,7 +832,7 @@ function ArrayFieldLibrary:Notify(NotificationSettings)
 	end)
 end
 
-ArrayFieldLibrary:Notify({Title = "Modified by ENZO-YT", Content = "Want more scripts that has been modified to support mobile? Check out my YouTube Channel ENZO-YT", Duration = 10})
+ArrayFieldLibrary:Notify({Title = "Modified by ENZO-YT", Content = "Check out my YouTube Channel ENZO-YT", Duration = 8})
 
 function CloseSideBar()
 	Debounce = true
