@@ -832,7 +832,7 @@ function ArrayFieldLibrary:Notify(NotificationSettings)
 	end)
 end
 
-ArrayFieldLibrary:Notify({Title = "Modified by Hosvile", Content = "Want more scripts that has been modified to support mobile? Check out my YouTube Channel Hosvile", Duration = 7})
+ArrayFieldLibrary:Notify({Title = "Modified by ENZO-YT", Content = "Check out my YouTube Channel ENZO-YT For More Script", Duration = 8})
 
 function CloseSideBar()
 	Debounce = true
@@ -3530,7 +3530,6 @@ local UniButton = Instance.new("ImageLabel")
 UniButton.Name = "UniButton"
 UniButton.Image = "rbxassetid://14958620447"
 UniButton.Active = false
---UniButton.AnchorPoint = Vector2.new(0.5,0.5)
 UniButton.ZIndex = 10
 UniButton.Position = UDim2.new(0.8,0,0,0)
 UniButton.BorderSizePixel = 0
@@ -3541,7 +3540,6 @@ UniButton.Parent = FieldScreen
 
 local UniBoxButton = Instance.new("TextButton")
 UniBoxButton.Name = "UniBoxButton"
---UniBoxButton.AnchorPoint = Vector2.new(0.5,0.5)
 UniBoxButton.ZIndex = 10
 UniBoxButton.AnchorPoint = Vector2.new(0.5, 0)
 UniBoxButton.Position = UDim2.new(0.5, 0, 0, 0)
@@ -3552,28 +3550,53 @@ UniBoxButton.Text = ""
 UniBoxButton.SizeConstraint = Enum.SizeConstraint.RelativeXY
 UniBoxButton.Parent = UniButton
 
+local dragging = false
+
+function dragGUI(input)
+    local startPos = input.Position
+    local startOffset = FieldScreen.AbsolutePosition - startPos
+
+    dragging = true
+
+    while dragging do
+        task.wait()
+        local newPos = input.Position + startOffset
+        FieldScreen.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
+    end
+end
+
+UniBoxButton.MouseButton1Down:Connect(function(input)
+    dragGUI(input)
+end)
+
+UniBoxButton.MouseButton1Up:Connect(function()
+    dragging = false
+end)
+
 ArrayFieldLibrary.UniButton = UniButton
 
 function ArrayFieldLibrary:Destroy()
-	ArrayField:Destroy()
-	FieldScreen:Destroy()
-	if KeyMainUI then KeyMainUI:Destroy() end
-	if KeyUI then KeyUI:Destroy() end
+    ArrayField:Destroy()
+    FieldScreen:Destroy()
+    if KeyMainUI then KeyMainUI:Destroy() end
+    if KeyUI then KeyUI:Destroy() end
 end
 
 UniButtonClicked = function(name,inputState,inputObject)
-	if Debounce then return end
-	if Hidden then
-		Hidden = false
-		Unhide()
-	else
-		if not SearchHided then spawn(CloseSearch) end
-		Hidden = true
-		Hide()
-	end
+    if Debounce then return end
+    if Hidden then
+        Hidden = false
+        Unhide()
+    else
+        if not SearchHided then spawn(CloseSearch) end
+        Hidden = true
+        Hide()
+    end
 end
 
 UniBoxButton.MouseButton1Click:Connect(UniButtonClicked)
+
+
 
 --[[
 local Field = ContextActionService:GetButton("Field")
