@@ -177,10 +177,10 @@ UniBoxButton.Text = ""
 UniBoxButton.SizeConstraint = Enum.SizeConstraint.RelativeXY
 UniBoxButton.Parent = UniButton
 
-ArrayFieldLibrary.UniButton = UniButton
+RayfieldLibrary.UniButton = UniButton
 
-function ArrayFieldLibrary:Destroy()
-	ArrayField:Destroy()
+function RayfieldLibrary:Destroy()
+	Rayfield:Destroy()
 	FieldScreen:Destroy()
 	if KeyMainUI then KeyMainUI:Destroy() end
 	if KeyUI then KeyUI:Destroy() end
