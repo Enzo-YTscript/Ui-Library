@@ -3522,8 +3522,6 @@ end,true)
 
 ---Hide Image Button android
 
-local UserInputService = game:GetService("UserInputService")
-
 local FieldScreen = Instance.new("ScreenGui")
 FieldScreen.DisplayOrder = 100
 FieldScreen.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
@@ -3533,9 +3531,10 @@ FieldScreen.Parent = gethui and gethui() or game:GetService("CoreGui")
 local UniButton = Instance.new("ImageLabel")
 UniButton.Name = "UniButton"
 UniButton.Image = "rbxassetid://14958620447"
-UniButton.Active = true -- Enable interaction
+UniButton.Active = false
+--UniButton.AnchorPoint = Vector2.new(0.5,0.5)
 UniButton.ZIndex = 10
-UniButton.Position = UDim2.new(0.8, 0, 0, 0)
+UniButton.Position = UDim2.new(0.8,0,0,0)
 UniButton.BorderSizePixel = 0
 UniButton.BackgroundTransparency = 1
 UniButton.Size = UDim2.new(0, 42, 0, 42)
@@ -3544,10 +3543,11 @@ UniButton.Parent = FieldScreen
 
 local UniBoxButton = Instance.new("TextButton")
 UniBoxButton.Name = "UniBoxButton"
+--UniBoxButton.AnchorPoint = Vector2.new(0.5,0.5)
 UniBoxButton.ZIndex = 10
 UniBoxButton.AnchorPoint = Vector2.new(0.5, 0)
 UniBoxButton.Position = UDim2.new(0.5, 0, 0, 0)
-UniBoxButton.Size = UDim2.new(0, 63, 0, 42)
+UniBoxButton.Size = UDim2.new(0, 42+21, 0, 42)
 UniBoxButton.BorderSizePixel = 0
 UniBoxButton.BackgroundTransparency = 1
 UniBoxButton.Text = ""
@@ -3557,64 +3557,25 @@ UniBoxButton.Parent = UniButton
 ArrayFieldLibrary.UniButton = UniButton
 
 function ArrayFieldLibrary:Destroy()
-    ArrayField:Destroy()
-    FieldScreen:Destroy()
-    if KeyMainUI then KeyMainUI:Destroy() end
-    if KeyUI then KeyUI:Destroy() end
+	ArrayField:Destroy()
+	FieldScreen:Destroy()
+	if KeyMainUI then KeyMainUI:Destroy() end
+	if KeyUI then KeyUI:Destroy() end
 end
 
-local dragging = false
-local dragInput, mousePos, framePos
-
-local function update(input)
-    local delta = input.Position - mousePos
-    local newPosition = UDim2.new(
-        framePos.X.Scale,
-        framePos.X.Offset + delta.X,
-        framePos.Y.Scale,
-        framePos.Y.Offset + delta.Y
-    )
-    UniButton.Position = newPosition
+UniButtonClicked = function(name,inputState,inputObject)
+	if Debounce then return end
+	if Hidden then
+		Hidden = false
+		Unhide()
+	else
+		if not SearchHided then spawn(CloseSearch) end
+		Hidden = true
+		Hide()
+	end
 end
 
-UniButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        mousePos = input.Position
-        framePos = UniButton.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-UniButton.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input == dragInput then
-        update(input)
-    end
-end)
-
-UniBoxButton.MouseButton1Click:Connect(function()
-    if Debounce then return end
-    if Hidden then
-        Hidden = false
-        Unhide()
-    else
-        if not SearchHided then spawn(CloseSearch) end
-        Hidden = true
-        Hide()
-    end
-end)
-
+UniBoxButton.MouseButton1Click:Connect(UniButtonClicked)
 
 --[[
 local Field = ContextActionService:GetButton("Field")
