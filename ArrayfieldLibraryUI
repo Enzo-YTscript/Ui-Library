@@ -3523,7 +3523,6 @@ end,true)
 ---Hide Image Button android
 
 local UserInputService = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
 
 local FieldScreen = Instance.new("ScreenGui")
 FieldScreen.DisplayOrder = 100
@@ -3599,7 +3598,7 @@ UniButton.InputChanged:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
+    if dragging and input == dragInput then
         update(input)
     end
 end)
