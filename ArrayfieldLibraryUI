@@ -3520,6 +3520,8 @@ ContextActionService:BindAction("Field",function(name,inputState,inputObject)
 end,true)
 --]]
 
+---Hide Image Button android
+
 local FieldScreen = Instance.new("ScreenGui")
 FieldScreen.DisplayOrder = 100
 FieldScreen.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
@@ -3529,7 +3531,7 @@ FieldScreen.Parent = gethui and gethui() or game:GetService("CoreGui")
 local UniButton = Instance.new("ImageLabel")
 UniButton.Name = "UniButton"
 UniButton.Image = "rbxassetid://14958620447"
-UniButton.Active = false
+UniButton.Active = true
 --UniButton.AnchorPoint = Vector2.new(0.5,0.5)
 UniButton.ZIndex = 10
 UniButton.Position = UDim2.new(0.8,0,0,0)
