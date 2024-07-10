@@ -171,40 +171,46 @@ ParentObject(ArrayField)
 
 --Object Variables
 local Camera = workspace.CurrentCamera
-local Main = ArrayField.Main
-local Topbar = Main.Topbar
-local Elements = Main.Elements
-local LoadingFrame = Main.LoadingFrame
-local TopList = Main.TabList
-local SideList = Main.SideTabList.Holder
-local TabsList = TopList and SideList
-local SearchBar = Main.SearchBar.Input -- Menyesuaikan sesuai dengan struktur yang ada
-local Prompt = Main.Prompt
-local NotePrompt = Main.NotePrompt
-local InfoPrompt = ArrayField.Info
-
-ArrayField.DisplayOrder = 100
-Elements.UIPageLayout.TouchInputEnabled = false
-LoadingFrame.Version.Text = Release
-
--- Menambahkan event listener untuk SearchBar
-if isMobile then
-    SearchBar.TouchTap:Connect(function()
-        bukaDropdown(SearchBar)
-        fokusSearchBar(SearchBar)
-    end)
-else
-    -- Untuk perangkat non-mobile, gunakan event MouseClick
-    SearchBar.MouseButton1Click:Connect(function()
-        bukaDropdown(SearchBar)
-        fokusSearchBar(SearchBar)
-    end)
+local Main = ArrayField:FindFirstChild("Main")
+local SearchBar
+if Main then
+    SearchBar = Main:FindFirstChild("SearchBar")
+end
+local SearchBarInput
+if SearchBar then
+    SearchBarInput = SearchBar:FindFirstChildWhichIsA("TextBox")
 end
 
--- Menutup dropdown saat fokus hilang
-SearchBar.FocusLost:Connect(function()
-    tutupDropdown(SearchBar)
-end)
+ArrayField.DisplayOrder = 100
+if Elements then
+    Elements.UIPageLayout.TouchInputEnabled = false
+end
+if LoadingFrame then
+    LoadingFrame.Version.Text = Release
+end
+
+if SearchBarInput then
+    -- Menambahkan event listener untuk SearchBar
+    if isMobile then
+        SearchBarInput.TouchTap:Connect(function()
+            bukaDropdown(SearchBar)
+            fokusSearchBar(SearchBarInput)
+        end)
+    else
+        -- Untuk perangkat non-mobile, gunakan event MouseClick
+        SearchBarInput.MouseButton1Click:Connect(function()
+            bukaDropdown(SearchBar)
+            fokusSearchBar(SearchBarInput)
+        end)
+    end
+
+    -- Menutup dropdown saat fokus hilang
+    SearchBarInput.FocusLost:Connect(function()
+        tutupDropdown(SearchBar)
+    end)
+else
+    warn("SearchBar TextBox tidak ditemukan di dalam SearchBar")
+end
 
 --Variables
 local request = request or (syn and syn.request) or (http and http.request) or http_request
