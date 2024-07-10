@@ -102,7 +102,18 @@ local ArrayFieldLibrary = {
 	}
 }
 
+-- Deklarasi Fungsi Penanganan Event
+local function bukaDropdown(dropdown)
+    dropdown.Visible = true
+end
 
+local function tutupDropdown(dropdown)
+    dropdown.Visible = false
+end
+
+local function fokusSearchBar(searchBar)
+    searchBar:CaptureFocus()
+end
 
 -- Services
 local UserInputService = game:GetService("UserInputService")
@@ -113,6 +124,9 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = game:GetService('Players').LocalPlayer
 
+-- Memeriksa apakah perangkat adalah perangkat mobile
+local isMobile = (UserInputService.TouchEnabled and not UserInputService.MouseEnabled)
+
 -- Interface Management
 local ArrayField = game:GetObjects("rbxassetid://13853811008")[1]
 ArrayField.Enabled = false
@@ -121,34 +135,41 @@ local delay = task.delay
 
 --Studio
 if game["Run Service"]:IsStudio() then
-	function gethui() return ArrayField end local http_request = nil local syn = {protect_gui = false,request = false,}local http = nil function writefile(tt,t,ttt)end function isfolder(t)end function makefolder(t)end function isfile(r)end function readfile(t)end
+    function gethui() return ArrayField end 
+    local http_request = nil 
+    local syn = {protect_gui = false,request = false,}
+    local http = nil 
+    function writefile(tt,t,ttt)end 
+    function isfolder(t)end 
+    function makefolder(t)end 
+    function isfile(r)end 
+    function readfile(t)end
 end
 
 pcall(function()
-	_G.LastRayField.Name = 'Old Arrayfield'
-	_G.LastRayField.Enabled = false
+    _G.LastRayField.Name = 'Old Arrayfield'
+    _G.LastRayField.Enabled = false
 end)
 local ParentObject = function(Gui)
-	local success, failure = pcall(function()
-		if get_hidden_gui or gethui then
-			local hiddenUI = get_hidden_gui or gethui
-			Gui.Parent = hiddenUI()
-		elseif (not is_sirhurt_closure) and (syn and syn.protect_gui) then
-			syn.protect_gui(Gui)
-			Gui.Parent = CoreGui
-		elseif CoreGui then
-			Gui.Parent = CoreGui
-		end
-	end)
-	if not success and failure then
-		Gui.Parent = LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
-	end
-	_G.LastRayField = ArrayField
+    local success, failure = pcall(function()
+        if get_hidden_gui or gethui then
+            local hiddenUI = get_hidden_gui or gethui
+            Gui.Parent = hiddenUI()
+        elseif (not is_sirhurt_closure) and (syn and syn.protect_gui) then
+            syn.protect_gui(Gui)
+            Gui.Parent = CoreGui
+        elseif CoreGui then
+            Gui.Parent = CoreGui
+        end
+    end)
+    if not success and failure then
+        Gui.Parent = LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
+    end
+    _G.LastRayField = ArrayField
 end
 ParentObject(ArrayField)
 
 --Object Variables
-
 local Camera = workspace.CurrentCamera
 local Main = ArrayField.Main
 local Topbar = Main.Topbar
@@ -167,6 +188,24 @@ ArrayField.DisplayOrder = 100
 Elements.UIPageLayout.TouchInputEnabled = false
 LoadingFrame.Version.Text = Release
 
+-- Menambahkan event listener untuk SearchBar
+if isMobile then
+    SearchBar.TouchTap:Connect(function()
+        bukaDropdown(SearchBar)
+        fokusSearchBar(SearchBar)
+    end)
+else
+    -- Untuk perangkat non-mobile, gunakan event MouseClick
+    SearchBar.MouseButton1Click:Connect(function()
+        bukaDropdown(SearchBar)
+        fokusSearchBar(SearchBar)
+    end)
+end
+
+-- Menutup dropdown saat fokus hilang
+SearchBar.FocusLost:Connect(function()
+    tutupDropdown(SearchBar)
+end)
 
 --Variables
 local request = request or (syn and syn.request) or (http and http.request) or http_request
@@ -2244,7 +2283,7 @@ function ArrayFieldLibrary:CreateWindow(Settings)
 			Dropdown.List['-SearchBar'].Input:GetPropertyChangedSignal('Text'):Connect(function()
 				local InputText=string.upper(Dropdown.List['-SearchBar'].Input.Text)
 				for _,item in ipairs(Dropdown.List:GetChildren()) do
-					if item:IsA('Frame') and item.Name ~= 'Template' and item ~= SearchBarulul and item.Name ~= 'PlaceHolder' then
+					if item:IsA('Frame') and item.Name ~= 'Template' and item ~= SearchBar and item.Name ~= 'PlaceHolder' then
 						if InputText=="" or InputText==" "or string.find(string.upper(item.Name),InputText)~=nil then
 							TweenService:Create(item, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {BackgroundTransparency = 0}):Play()
 							TweenService:Create(item.UIStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {Transparency = 0}):Play()
