@@ -202,10 +202,6 @@ else
     end)
 end
 
--- Menutup dropdown saat fokus hilang
-SearchBar.FocusLost:Connect(function()
-    tutupDropdown(SearchBar)
-end)
 
 --Variables
 local request = request or (syn and syn.request) or (http and http.request) or http_request
