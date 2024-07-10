@@ -3568,12 +3568,13 @@ local dragInput, mousePos, framePos
 
 local function update(input)
     local delta = input.Position - mousePos
-    UniButton.Position = UDim2.new(
+    local newPosition = UDim2.new(
         framePos.X.Scale,
         framePos.X.Offset + delta.X,
         framePos.Y.Scale,
         framePos.Y.Offset + delta.Y
     )
+    UniButton.Position = newPosition
 end
 
 UniButton.InputBegan:Connect(function(input)
@@ -3613,6 +3614,7 @@ UniBoxButton.MouseButton1Click:Connect(function()
         Hide()
     end
 end)
+
 
 
 --[[
