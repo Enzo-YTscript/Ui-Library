@@ -3522,6 +3522,8 @@ end,true)
 
 ---Hide Image Button android
 
+local UserInputService = game:GetService("UserInputService")
+
 local FieldScreen = Instance.new("ScreenGui")
 FieldScreen.DisplayOrder = 100
 FieldScreen.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
@@ -3564,8 +3566,18 @@ end
 local dragging = false
 local dragInput, mousePos, framePos
 
+local function update(input)
+    local delta = input.Position - mousePos
+    UniButton.Position = UDim2.new(
+        framePos.X.Scale,
+        framePos.X.Offset + delta.X,
+        framePos.Y.Scale,
+        framePos.Y.Offset + delta.Y
+    )
+end
+
 UniButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         mousePos = input.Position
         framePos = UniButton.Position
@@ -3579,20 +3591,14 @@ UniButton.InputBegan:Connect(function(input)
 end)
 
 UniButton.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
-        local delta = input.Position - mousePos
-        UniButton.Position = UDim2.new(
-            framePos.X.Scale,
-            framePos.X.Offset + delta.X,
-            framePos.Y.Scale,
-            framePos.Y.Offset + delta.Y
-        )
+        update(input)
     end
 end)
 
@@ -3607,6 +3613,7 @@ UniBoxButton.MouseButton1Click:Connect(function()
         Hide()
     end
 end)
+
 
 --[[
 local Field = ContextActionService:GetButton("Field")
