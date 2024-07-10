@@ -170,6 +170,7 @@ end
 ParentObject(ArrayField)
 
 --Object Variables
+
 local Camera = workspace.CurrentCamera
 local Main = ArrayField.Main
 local Topbar = Main.Topbar
@@ -180,8 +181,7 @@ local SideList = Main.SideTabList.Holder
 local TabsList = TopList and SideList
 local SearchBarFrame = Main.Searchbar
 local SearchBar = SearchBarFrame:FindFirstChildWhichIsA("TextBox") -- Mencari TextBox di dalam SearchBarFrame
-
-local Filler = SearchBarFrame.CanvasGroup.Filler
+local Filler = SearchBar.CanvasGroup.Filler
 local Prompt = Main.Prompt
 local NotePrompt = Main.NotePrompt
 local InfoPrompt = ArrayField.Info
