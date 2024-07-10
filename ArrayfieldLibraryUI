@@ -170,7 +170,6 @@ end
 ParentObject(ArrayField)
 
 --Object Variables
-
 local Camera = workspace.CurrentCamera
 local Main = ArrayField.Main
 local Topbar = Main.Topbar
@@ -179,9 +178,7 @@ local LoadingFrame = Main.LoadingFrame
 local TopList = Main.TabList
 local SideList = Main.SideTabList.Holder
 local TabsList = TopList and SideList
-local SearchBarFrame = Main.Searchbar
 local SearchBar = SearchBarFrame:FindFirstChildWhichIsA("TextBox") -- Mencari TextBox di dalam SearchBarFrame
-local Filler = SearchBar.CanvasGroup.Filler
 local Prompt = Main.Prompt
 local NotePrompt = Main.NotePrompt
 local InfoPrompt = ArrayField.Info
@@ -190,28 +187,24 @@ ArrayField.DisplayOrder = 100
 Elements.UIPageLayout.TouchInputEnabled = false
 LoadingFrame.Version.Text = Release
 
-if SearchBar then
-    -- Menambahkan event listener untuk SearchBar
-    if isMobile then
-        SearchBar.TouchTap:Connect(function()
-            bukaDropdown(SearchBarFrame)
-            fokusSearchBar(SearchBar)
-        end)
-    else
-        -- Untuk perangkat non-mobile, gunakan event MouseClick
-        SearchBar.MouseButton1Click:Connect(function()
-            bukaDropdown(SearchBarFrame)
-            fokusSearchBar(SearchBar)
-        end)
-    end
-
-    -- Menutup dropdown saat fokus hilang
-    SearchBar.FocusLost:Connect(function()
-        tutupDropdown(SearchBarFrame)
+-- Menambahkan event listener untuk SearchBar
+if isMobile then
+    SearchBar.TouchTap:Connect(function()
+        bukaDropdown(SearchBar)
+        fokusSearchBar(SearchBar)
     end)
 else
-    warn("SearchBar TextBox tidak ditemukan di dalam SearchBarFrame")
+    -- Untuk perangkat non-mobile, gunakan event MouseClick
+    SearchBar.MouseButton1Click:Connect(function()
+        bukaDropdown(SearchBar)
+        fokusSearchBar(SearchBar)
+    end)
 end
+
+-- Menutup dropdown saat fokus hilang
+SearchBar.FocusLost:Connect(function()
+    tutupDropdown(SearchBar)
+end)
 
 --Variables
 local request = request or (syn and syn.request) or (http and http.request) or http_request
