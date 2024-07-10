@@ -102,7 +102,18 @@ local ArrayFieldLibrary = {
 	}
 }
 
+-- Deklarasi Fungsi Penanganan Event
+local function bukaDropdown(dropdown)
+    dropdown.Visible = true
+end
 
+local function tutupDropdown(dropdown)
+    dropdown.Visible = false
+end
+
+local function fokusSearchBar(searchBar)
+    searchBar:CaptureFocus()
+end
 
 -- Services
 local UserInputService = game:GetService("UserInputService")
@@ -113,6 +124,9 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = game:GetService('Players').LocalPlayer
 
+-- Memeriksa apakah perangkat adalah perangkat mobile
+local isMobile = (UserInputService.TouchEnabled and not UserInputService.MouseEnabled)
+
 -- Interface Management
 local ArrayField = game:GetObjects("rbxassetid://13853811008")[1]
 ArrayField.Enabled = false
@@ -121,29 +135,37 @@ local delay = task.delay
 
 --Studio
 if game["Run Service"]:IsStudio() then
-	function gethui() return ArrayField end local http_request = nil local syn = {protect_gui = false,request = false,}local http = nil function writefile(tt,t,ttt)end function isfolder(t)end function makefolder(t)end function isfile(r)end function readfile(t)end
+    function gethui() return ArrayField end 
+    local http_request = nil 
+    local syn = {protect_gui = false,request = false,}
+    local http = nil 
+    function writefile(tt,t,ttt)end 
+    function isfolder(t)end 
+    function makefolder(t)end 
+    function isfile(r)end 
+    function readfile(t)end
 end
 
 pcall(function()
-	_G.LastRayField.Name = 'Old Arrayfield'
-	_G.LastRayField.Enabled = false
+    _G.LastRayField.Name = 'Old Arrayfield'
+    _G.LastRayField.Enabled = false
 end)
 local ParentObject = function(Gui)
-	local success, failure = pcall(function()
-		if get_hidden_gui or gethui then
-			local hiddenUI = get_hidden_gui or gethui
-			Gui.Parent = hiddenUI()
-		elseif (not is_sirhurt_closure) and (syn and syn.protect_gui) then
-			syn.protect_gui(Gui)
-			Gui.Parent = CoreGui
-		elseif CoreGui then
-			Gui.Parent = CoreGui
-		end
-	end)
-	if not success and failure then
-		Gui.Parent = LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
-	end
-	_G.LastRayField = ArrayField
+    local success, failure = pcall(function()
+        if get_hidden_gui or gethui then
+            local hiddenUI = get_hidden_gui or gethui
+            Gui.Parent = hiddenUI()
+        elseif (not is_sirhurt_closure) and (syn and syn.protect_gui) then
+            syn.protect_gui(Gui)
+            Gui.Parent = CoreGui
+        elseif CoreGui then
+            Gui.Parent = CoreGui
+        end
+    end)
+    if not success and failure then
+        Gui.Parent = LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
+    end
+    _G.LastRayField = ArrayField
 end
 ParentObject(ArrayField)
 
@@ -157,7 +179,8 @@ local LoadingFrame = Main.LoadingFrame
 local TopList = Main.TabList
 local SideList = Main.SideTabList.Holder
 local TabsList = TopList and SideList
-local SearchBar = Main.Searchbar
+local SearchBarFrame = Main.Searchbar
+local SearchBar = SearchBarFrame:FindFirstChildWhichIsA("TextBox") -- Mencari TextBox di dalam SearchBarFrame
 local Filler = SearchBar.CanvasGroup.Filler
 local Prompt = Main.Prompt
 local NotePrompt = Main.NotePrompt
@@ -167,6 +190,28 @@ ArrayField.DisplayOrder = 100
 Elements.UIPageLayout.TouchInputEnabled = false
 LoadingFrame.Version.Text = Release
 
+if SearchBar then
+    -- Menambahkan event listener untuk SearchBar
+    if isMobile then
+        SearchBar.TouchTap:Connect(function()
+            bukaDropdown(SearchBarFrame)
+            fokusSearchBar(SearchBar)
+        end)
+    else
+        -- Untuk perangkat non-mobile, gunakan event MouseClick
+        SearchBar.MouseButton1Click:Connect(function()
+            bukaDropdown(SearchBarFrame)
+            fokusSearchBar(SearchBar)
+        end)
+    end
+
+    -- Menutup dropdown saat fokus hilang
+    SearchBar.FocusLost:Connect(function()
+        tutupDropdown(SearchBarFrame)
+    end)
+else
+    warn("SearchBar TextBox tidak ditemukan di dalam SearchBarFrame")
+end
 
 --Variables
 local request = request or (syn and syn.request) or (http and http.request) or http_request
