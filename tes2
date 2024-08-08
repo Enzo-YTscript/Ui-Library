@@ -1,5 +1,4 @@
 --[[
-
 ArrayField Interface Suite
 by Meta
 
@@ -7,7 +6,6 @@ Original by Sirius
 
 -------------------------------
 Arrays  | Designing + Programming + New Features
-
 ]]
 
 local Release = "Release 2A"
@@ -101,8 +99,6 @@ local ArrayFieldLibrary = {
 
     }
 }
-
-
 
 -- Services
 local UserInputService = game:GetService("UserInputService")
@@ -1045,7 +1041,6 @@ end
 -- Contoh inisialisasi dropdown
 local mainUI = script.Parent  -- Asumsikan ini adalah elemen UI utama
 local dropdown = CreateDropdown(mainUI)
-
 
 
 SearchBar.Input:GetPropertyChangedSignal('Text'):Connect(function()
