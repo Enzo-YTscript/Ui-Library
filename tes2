@@ -113,6 +113,15 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = game:GetService('Players').LocalPlayer
 
+-- Ensure that touch input is enabled and handled
+UserInputService.TouchEnabled = true
+
+UserInputService.TouchTap:Connect(function(input, processed)
+    if not processed then
+        -- Handle touch input
+    end
+end)
+
 -- Interface Management
 local ArrayField = game:GetObjects("rbxassetid://13853811008")[1]
 ArrayField.Enabled = false
