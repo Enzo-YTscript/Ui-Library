@@ -1008,21 +1008,51 @@ function CloseSearch()
 	Debounce = false
 end
 function OpenSearch()
-	Debounce = true
-	SearchBar.Visible = true
-	SearchBar.Input.Visible = true
-	SearchBar.Input.ClearTextOnFocus = false
-	SearchBar.Input.Active = true
-	TweenService:Create(SearchBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {BackgroundTransparency = 0,Size = UDim2.new(0, 480,0, 40)}):Play()
-	TweenService:Create(SearchBar.Icon, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 0.5}):Play()
-	TweenService:Create(SearchBar.Shadow.Image, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 0.1}):Play()
-	TweenService:Create(SearchBar.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Transparency = 0}):Play()
-	TweenService:Create(SearchBar.Clear, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = .8}):Play()
-	TweenService:Create(SearchBar.Filter, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = .8}):Play()
-	TweenService:Create(SearchBar.Input, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
-	wait(0.5)
-	Debounce = false
+    Debounce = true
+    SearchBar.Visible = true
+    SearchBar.Input.Visible = true
+    SearchBar.Input.ClearTextOnFocus = false
+    SearchBar.Input.Active = true
+    SearchBar.Input.Selectable = true  -- Ensure the TextBox is selectable
+    TweenService:Create(SearchBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {BackgroundTransparency = 0, Size = UDim2.new(0, 480, 0, 40)}):Play()
+    TweenService:Create(SearchBar.Icon, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 0.5}):Play()
+    TweenService:Create(SearchBar.Shadow.Image, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 0.5}):Play()
+    TweenService:Create(SearchBar.Input, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
+
+    -- Add touch input handling
+    SearchBar.Input.TouchTap:Connect(function()
+        SearchBar.Input:CaptureFocus()
+    end)
+
+    Debounce = false
 end
+
+-- Contoh fungsi Dropdown dengan penanganan sentuhan
+function CreateDropdown(parent)
+    local dropdown = Instance.new("Frame")
+    dropdown.Size = UDim2.new(0, 200, 0, 50)
+    dropdown.Parent = parent
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1, -10, 1, -10)
+    input.Position = UDim2.new(0, 5, 0, 5)
+    input.Parent = dropdown
+    input.ClearTextOnFocus = false
+    input.Active = true
+    input.Selectable = true
+
+    -- Add touch input handling
+    input.TouchTap:Connect(function()
+        input:CaptureFocus()
+    end)
+
+    return dropdown
+end
+
+-- Contoh inisialisasi dropdown
+local mainUI = script.Parent  -- Asumsikan ini adalah elemen UI utama
+local dropdown = CreateDropdown(mainUI)
+
 SearchBar.Input:GetPropertyChangedSignal('Text'):Connect(function()
 	local InputText=string.upper(SearchBar.Input.Text)
 	for _,page in ipairs(Elements:GetChildren()) do
