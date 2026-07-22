@@ -973,33 +973,44 @@ saveBtn.MouseButton1Click:Connect(function()
     saveBtn.BackgroundColor3 = origColor
     saveBtn.Text = "💾"
 end)
-
 -- ============================================
--- MINIMIZE BUTTON
+-- MINIMIZE BUTTON (FIXED)
 -- ============================================
 local isMinimized = CONFIG.minimized or false
-local originalSize = UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
+local savedSize = nil -- will store size before minimize
 
 local function toggleMinimize()
     isMinimized = not isMinimized
     CONFIG.minimized = isMinimized
+
     if isMinimized then
-        originalSize = MF.Size
-        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, MF.AbsoluteSize.X, 0, 40)}):Play()
+        -- Save current size before collapsing
+        savedSize = UDim2.new(0, MF.AbsoluteSize.X, 0, MF.AbsoluteSize.Y)
         Content.Visible = false
         TabBar.Visible = false
+        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = UDim2.new(0, MF.AbsoluteSize.X, 0, 40)
+        }):Play()
         minBtn.Text = "+"
     else
+        -- Restore to saved size
+        local restoreSize = savedSize or UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
+        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = restoreSize
+        }):Play()
+        task.wait(0.3)
         Content.Visible = true
         TabBar.Visible = true
-        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = originalSize}):Play()
         minBtn.Text = "—"
     end
     saveConfig()
 end
+
 minBtn.MouseButton1Click:Connect(toggleMinimize)
 
+-- Apply minimized state on load
 if isMinimized then
+    savedSize = UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
     Content.Visible = false
     TabBar.Visible = false
     MF.Size = UDim2.new(0, CONFIG.sizeW, 0, 40)
@@ -1007,9 +1018,10 @@ if isMinimized then
 end
 
 print("✅ v29 PART 2 UI Framework loaded!")
+
 -- ============================================
--- v29 PART 3 FIX - ALL TABS
--- Paste ini menggantikan PART 3 sebelumnya
+-- v29 PART 3 FIXED - ALL TABS
+-- Fix: Minimize, Resize, Explore All, Instant Interact
 -- ============================================
 
 -- ============================================
@@ -1024,26 +1036,25 @@ local MainTab = createTab("Main", "🏠")
 
 mkSection(MainTab, "MOVEMENT")
 
--- FLY TOGGLE (dulu hilang!)
+-- FLY TOGGLE
 local flyTgl = mkToggle(MainTab, "Fly Mode", "🕊️")
 flyTgl.button.MouseButton1Click:Connect(function()
     S.flyOn = not S.flyOn
     flyTgl.setState(S.flyOn)
-    if S.flyOn then 
-        startFly() 
-        flyTgl.count.Text = "WASD+Space or ▲▼" 
-    else 
-        stopFly() 
-        flyTgl.count.Text = "Ready" 
+    if S.flyOn then
+        startFly()
+        flyTgl.count.Text = "WASD+Space or ▲▼"
+    else
+        stopFly()
+        flyTgl.count.Text = "Ready"
     end
 end)
 
--- FLY SPEED INPUT
 local flySpdInp = mkInput(MainTab, "Fly Speed:", "💨", S.flySpeed, "s/s")
-flySpdInp.FocusLost:Connect(function() 
-    local n = tonumber(flySpdInp.Text) 
-    if n and n > 0 and n <= 500 then S.flySpeed = n 
-    else flySpdInp.Text = tostring(S.flySpeed) end 
+flySpdInp.FocusLost:Connect(function()
+    local n = tonumber(flySpdInp.Text)
+    if n and n > 0 and n <= 500 then S.flySpeed = n
+    else flySpdInp.Text = tostring(S.flySpeed) end
 end)
 
 -- WALK SPEED TOGGLE
@@ -1051,33 +1062,121 @@ local walkTgl = mkToggle(MainTab, "Walk Speed", "🏃")
 walkTgl.button.MouseButton1Click:Connect(function()
     S.walkSpeedOn = not S.walkSpeedOn
     walkTgl.setState(S.walkSpeedOn)
-    if S.walkSpeedOn then 
-        startWalkSpeed() 
-        walkTgl.count.Text = "Speed: " .. S.walkSpeed 
-    else 
-        stopWalkSpeed() 
-        walkTgl.count.Text = "Ready" 
+    if S.walkSpeedOn then
+        startWalkSpeed()
+        walkTgl.count.Text = "Speed: " .. S.walkSpeed
+    else
+        stopWalkSpeed()
+        walkTgl.count.Text = "Ready"
     end
 end)
 
--- WALK SPEED INPUT
 local walkSpdInp = mkInput(MainTab, "Walk Speed:", "🏃", S.walkSpeed, "s/s")
-walkSpdInp.FocusLost:Connect(function() 
-    local n = tonumber(walkSpdInp.Text) 
-    if n and n > 0 and n <= 200 then S.walkSpeed = n 
-    else walkSpdInp.Text = tostring(S.walkSpeed) end 
+walkSpdInp.FocusLost:Connect(function()
+    local n = tonumber(walkSpdInp.Text)
+    if n and n > 0 and n <= 200 then S.walkSpeed = n
+    else walkSpdInp.Text = tostring(S.walkSpeed) end
+end)
+
+-- ============================================
+-- INSTANT INTERACTION TOGGLE (NEW)
+-- ============================================
+mkSection(MainTab, "INTERACTION")
+
+local instantInteractOn = false
+local instantInteractConn = nil
+
+local interactTgl = mkToggle(MainTab, "Instant Interact", "⚡")
+interactTgl.button.MouseButton1Click:Connect(function()
+    instantInteractOn = not instantInteractOn
+    interactTgl.setState(instantInteractOn)
+    if instantInteractOn then
+        interactTgl.count.Text = "Active"
+        -- Loop: auto detect & press interaction buttons
+        if instantInteractConn then return end
+        task.spawn(function()
+            instantInteractConn = true
+            while instantInteractOn do
+                pcall(function()
+                    -- Method 1: Fire ProximityPrompts instantly
+                    local char = player.Character
+                    if char then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local myPos = hrp.Position
+                            -- Search all ProximityPrompts in workspace
+                            for _, pp in pairs(workspace:GetDescendants()) do
+                                if not instantInteractOn then break end
+                                if pp:IsA("ProximityPrompt") then
+                                    local ppParent = pp.Parent
+                                    if ppParent and ppParent:IsA("BasePart") then
+                                        local dist = (ppParent.Position - myPos).Magnitude
+                                        if dist <= (pp.MaxActivationDistance or 10) + 5 then
+                                            -- Force trigger
+                                            pcall(function()
+                                                pp.MaxActivationDistance = 9999
+                                                pp.RequiresLineOfSight = false
+                                                pp.HoldDuration = 0
+                                            end)
+                                            pcall(function()
+                                                fireproximityprompt(pp)
+                                            end)
+                                        end
+                                    elseif ppParent and ppParent:IsA("Model") then
+                                        local pos = getObjPos(ppParent)
+                                        if pos then
+                                            local dist = (pos - myPos).Magnitude
+                                            if dist <= (pp.MaxActivationDistance or 10) + 5 then
+                                                pcall(function()
+                                                    pp.MaxActivationDistance = 9999
+                                                    pp.RequiresLineOfSight = false
+                                                    pp.HoldDuration = 0
+                                                end)
+                                                pcall(function()
+                                                    fireproximityprompt(pp)
+                                                end)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+
+                            -- Method 2: Also fire Touch GUI buttons (Drag/Collect/Eat/Store/Open)
+                            local touchBtns = {"Drag", "Collect", "Eat", "Store", "Open", "Interact", "Use", "Pick Up", "Grab"}
+                            for _, btnName in ipairs(touchBtns) do
+                                if not instantInteractOn then break end
+                                local btn = findTouchButton(btnName)
+                                if btn then
+                                    fireGuiButton(btn)
+                                end
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.15)
+            end
+            instantInteractConn = nil
+        end)
+    else
+        interactTgl.count.Text = "Ready"
+    end
 end)
 
 mkSection(MainTab, "QUICK TP")
 
 local homeBtn = mkButton(MainTab, "🏠 TP Home (Bonfire)", Color3.fromRGB(60, 140, 100))
-homeBtn.MouseButton1Click:Connect(function() 
-    pcall(function() tpTo(workspace:WaitForChild("SpawnIsland", 5):WaitForChild("Bonfire", 5)) end) 
+homeBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        tpTo(workspace:WaitForChild("SpawnIsland", 5):WaitForChild("Bonfire", 5))
+    end)
 end)
 
 local merchBtn = mkButton(MainTab, "🏪 TP Merchant", Color3.fromRGB(140, 100, 60))
-merchBtn.MouseButton1Click:Connect(function() 
-    pcall(function() local m = workspace:FindFirstChild("MerchantBrick") if m then tpTo(m) end end) 
+merchBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        local m = workspace:FindFirstChild("MerchantBrick")
+        if m then tpTo(m) end
+    end)
 end)
 
 mkSection(MainTab, "PLAYER STATUS")
@@ -1090,24 +1189,44 @@ statFrame.LayoutOrder = nxtLO(MainTab)
 Instance.new("UICorner", statFrame).CornerRadius = UDim.new(0, 8)
 
 local sFood = Instance.new("TextLabel", statFrame)
-sFood.Size = UDim2.new(0.5, -8, 0, 22) sFood.Position = UDim2.new(0, 10, 0, 5)
-sFood.BackgroundTransparency = 1 sFood.Text = "🍖 ?" sFood.TextColor3 = Color3.fromRGB(255, 180, 80)
-sFood.TextSize = 12 sFood.Font = Enum.Font.GothamBold sFood.TextXAlignment = Enum.TextXAlignment.Left
+sFood.Size = UDim2.new(0.5, -8, 0, 22)
+sFood.Position = UDim2.new(0, 10, 0, 5)
+sFood.BackgroundTransparency = 1
+sFood.Text = "🍖 ?"
+sFood.TextColor3 = Color3.fromRGB(255, 180, 80)
+sFood.TextSize = 12
+sFood.Font = Enum.Font.GothamBold
+sFood.TextXAlignment = Enum.TextXAlignment.Left
 
 local sHP = Instance.new("TextLabel", statFrame)
-sHP.Size = UDim2.new(0.5, -8, 0, 22) sHP.Position = UDim2.new(0.5, 5, 0, 5)
-sHP.BackgroundTransparency = 1 sHP.Text = "❤️ ?" sHP.TextColor3 = Color3.fromRGB(255, 100, 100)
-sHP.TextSize = 12 sHP.Font = Enum.Font.GothamBold sHP.TextXAlignment = Enum.TextXAlignment.Left
+sHP.Size = UDim2.new(0.5, -8, 0, 22)
+sHP.Position = UDim2.new(0.5, 5, 0, 5)
+sHP.BackgroundTransparency = 1
+sHP.Text = "❤️ ?"
+sHP.TextColor3 = Color3.fromRGB(255, 100, 100)
+sHP.TextSize = 12
+sHP.Font = Enum.Font.GothamBold
+sHP.TextXAlignment = Enum.TextXAlignment.Left
 
 local sClass = Instance.new("TextLabel", statFrame)
-sClass.Size = UDim2.new(0.5, -8, 0, 20) sClass.Position = UDim2.new(0, 10, 0, 30)
-sClass.BackgroundTransparency = 1 sClass.Text = "⭐ ?" sClass.TextColor3 = Color3.fromRGB(255, 220, 100)
-sClass.TextSize = 11 sClass.Font = Enum.Font.GothamSemibold sClass.TextXAlignment = Enum.TextXAlignment.Left
+sClass.Size = UDim2.new(0.5, -8, 0, 20)
+sClass.Position = UDim2.new(0, 10, 0, 30)
+sClass.BackgroundTransparency = 1
+sClass.Text = "⭐ ?"
+sClass.TextColor3 = Color3.fromRGB(255, 220, 100)
+sClass.TextSize = 11
+sClass.Font = Enum.Font.GothamSemibold
+sClass.TextXAlignment = Enum.TextXAlignment.Left
 
 local sCoin = Instance.new("TextLabel", statFrame)
-sCoin.Size = UDim2.new(0.5, -8, 0, 20) sCoin.Position = UDim2.new(0.5, 5, 0, 30)
-sCoin.BackgroundTransparency = 1 sCoin.Text = "🪙 ?" sCoin.TextColor3 = Color3.fromRGB(255, 200, 50)
-sCoin.TextSize = 11 sCoin.Font = Enum.Font.GothamSemibold sCoin.TextXAlignment = Enum.TextXAlignment.Left
+sCoin.Size = UDim2.new(0.5, -8, 0, 20)
+sCoin.Position = UDim2.new(0.5, 5, 0, 30)
+sCoin.BackgroundTransparency = 1
+sCoin.Text = "🪙 ?"
+sCoin.TextColor3 = Color3.fromRGB(255, 200, 50)
+sCoin.TextSize = 11
+sCoin.Font = Enum.Font.GothamSemibold
+sCoin.TextXAlignment = Enum.TextXAlignment.Left
 
 task.spawn(function()
     while SG and SG.Parent do
@@ -1130,9 +1249,17 @@ mkSection(ResTab, "SELECT")
 local resDropdown = mkDropdown(ResTab, "Select Resource", "🪨", S.RLIST, function(v) S.selRes = v end)
 
 local resRefreshBtn = mkButton(ResTab, "🔄 Refresh Resources", Color3.fromRGB(50, 130, 80))
-resRefreshBtn.MouseButton1Click:Connect(function() scanRes() resDropdown.refresh(S.RLIST) end)
+resRefreshBtn.MouseButton1Click:Connect(function()
+    scanRes()
+    resDropdown.refresh(S.RLIST)
+end)
 
-task.spawn(function() while SG and SG.Parent do task.wait(2) pcall(function() resDropdown.refresh(S.RLIST) end) end end)
+task.spawn(function()
+    while SG and SG.Parent do
+        task.wait(2)
+        pcall(function() resDropdown.refresh(S.RLIST) end)
+    end
+end)
 
 mkSection(ResTab, "ACTIONS")
 
@@ -1142,23 +1269,43 @@ tpFrzTgl.button.MouseButton1Click:Connect(function()
     tpFrzTgl.setState(S.tpResOn)
     if S.tpResOn then
         if S.tpLoop then return end
-        S.tpLoop = true S.tpCount = 0 S.frozen = {}
+        S.tpLoop = true
+        S.tpCount = 0
+        S.frozen = {}
         startFL()
         coroutine.wrap(function()
             while S.tpResOn and S.tpLoop do
-                if not S.selRes then tpFrzTgl.count.Text = "⚠️ Select!" task.wait(1) continue end
+                if not S.selRes then
+                    tpFrzTgl.count.Text = "⚠️ Select!"
+                    task.wait(1)
+                    continue
+                end
                 local inst = getResInst(S.selRes)
                 local uf = {}
-                for _, o in ipairs(inst) do if o and o.Parent and not S.frozen[o] then table.insert(uf, o) end end
+                for _, o in ipairs(inst) do
+                    if o and o.Parent and not S.frozen[o] then
+                        table.insert(uf, o)
+                    end
+                end
                 tpFrzTgl.count.Text = "Rem: " .. #uf .. "/" .. #inst
-                if #uf == 0 then tpFrzTgl.count.Text = "✅ All frozen" task.wait(3) continue end
+                if #uf == 0 then
+                    tpFrzTgl.count.Text = "✅ All frozen"
+                    task.wait(3)
+                    continue
+                end
                 local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
                 if not hrp then task.wait(0.5) continue end
                 for i, obj in ipairs(uf) do
                     if not S.tpResOn or not S.tpLoop then break end
                     if obj and obj.Parent then
-                        local cf = hrp.CFrame * CFrame.new(math.random(-30, 30) / 10, 0, -S.tpDist + math.random(-20, 20) / 10)
-                        mvO(obj, cf) frzO(obj) S.frozen[obj] = cf S.tpCount = S.tpCount + 1
+                        local cf = hrp.CFrame * CFrame.new(
+                            math.random(-30, 30) / 10, 0,
+                            -S.tpDist + math.random(-20, 20) / 10
+                        )
+                        mvO(obj, cf)
+                        frzO(obj)
+                        S.frozen[obj] = cf
+                        S.tpCount = S.tpCount + 1
                         tpFrzTgl.count.Text = "Frozen: " .. S.tpCount
                         task.wait(S.tpDelay)
                     end
@@ -1167,11 +1314,19 @@ tpFrzTgl.button.MouseButton1Click:Connect(function()
             end
             S.tpLoop = false
         end)()
-    else S.tpResOn = false S.tpLoop = false end
+    else
+        S.tpResOn = false
+        S.tpLoop = false
+    end
 end)
 
 local unfrzBtn = mkButton(ResTab, "🔓 Unfreeze All", Color3.fromRGB(180, 60, 60))
-unfrzBtn.MouseButton1Click:Connect(function() stopFL() S.frozen = {} S.tpCount = 0 tpFrzTgl.count.Text = "Released" end)
+unfrzBtn.MouseButton1Click:Connect(function()
+    stopFL()
+    S.frozen = {}
+    S.tpCount = 0
+    tpFrzTgl.count.Text = "Released"
+end)
 
 local dragTgl = mkToggle(ResTab, "Auto Drag (Collect/Eat/Store)", "🔄")
 dragTgl.button.MouseButton1Click:Connect(function()
@@ -1179,12 +1334,21 @@ dragTgl.button.MouseButton1Click:Connect(function()
     dragTgl.setState(S.autoResOn)
     if S.autoResOn then
         if S.autoResRun then return end
-        S.autoResRun = true S.autoResCnt = 0
+        S.autoResRun = true
+        S.autoResCnt = 0
         coroutine.wrap(function()
             while S.autoResOn and S.autoResRun do
-                if not S.selRes then dragTgl.count.Text = "⚠️ Select!" task.wait(1) continue end
+                if not S.selRes then
+                    dragTgl.count.Text = "⚠️ Select!"
+                    task.wait(1)
+                    continue
+                end
                 local inst = getResInst(S.selRes)
-                if #inst == 0 then dragTgl.count.Text = "✅ Done: " .. S.autoResCnt task.wait(3) continue end
+                if #inst == 0 then
+                    dragTgl.count.Text = "✅ Done: " .. S.autoResCnt
+                    task.wait(3)
+                    continue
+                end
                 for i, obj in ipairs(inst) do
                     if not S.autoResOn or not S.autoResRun then break end
                     if obj and obj.Parent then
@@ -1198,23 +1362,41 @@ dragTgl.button.MouseButton1Click:Connect(function()
             end
             S.autoResRun = false
         end)()
-    else S.autoResOn = false S.autoResRun = false end
+    else
+        S.autoResOn = false
+        S.autoResRun = false
+    end
 end)
 
 local dragDelayInp = mkInput(ResTab, "Drag Delay:", "⏱️", S.autoResDelay, "s")
-dragDelayInp.FocusLost:Connect(function() local n = tonumber(dragDelayInp.Text) if n and n >= 0.1 then S.autoResDelay = n else dragDelayInp.Text = tostring(S.autoResDelay) end end)
+dragDelayInp.FocusLost:Connect(function()
+    local n = tonumber(dragDelayInp.Text)
+    if n and n >= 0.1 then S.autoResDelay = n
+    else dragDelayInp.Text = tostring(S.autoResDelay) end
+end)
 
 -- ============================================
 -- TAB: CHESTS
 -- ============================================
 local ChestTab = createTab("Chests", "📦")
 
-local chestDropdown = mkDropdown(ChestTab, "Select Chest", "📦", S.CLIST, function(v) S.selChest = v S.chIdx = 1 end)
+local chestDropdown = mkDropdown(ChestTab, "Select Chest", "📦", S.CLIST, function(v)
+    S.selChest = v
+    S.chIdx = 1
+end)
 
 local chestRefreshBtn = mkButton(ChestTab, "🔄 Refresh Chests", Color3.fromRGB(50, 130, 80))
-chestRefreshBtn.MouseButton1Click:Connect(function() scanChests() chestDropdown.refresh(S.CLIST) end)
+chestRefreshBtn.MouseButton1Click:Connect(function()
+    scanChests()
+    chestDropdown.refresh(S.CLIST)
+end)
 
-task.spawn(function() while SG and SG.Parent do task.wait(2) pcall(function() chestDropdown.refresh(S.CLIST) end) end end)
+task.spawn(function()
+    while SG and SG.Parent do
+        task.wait(2)
+        pcall(function() chestDropdown.refresh(S.CLIST) end)
+    end
+end)
 
 mkSection(ChestTab, "NAVIGATION")
 
@@ -1232,7 +1414,9 @@ local function updateChStatus()
         local inst = getCI(S.selChest)
         S.chIdx = math.clamp(S.chIdx, 1, math.max(#inst, 1))
         chStatus.Text = "📦 " .. S.selChest .. " [" .. S.chIdx .. "/" .. #inst .. "]"
-    else chStatus.Text = "📦 -" end
+    else
+        chStatus.Text = "📦 -"
+    end
 end
 
 local tpChestBtn = mkButton(ChestTab, "🏃 TP to Chest", Color3.fromRGB(180, 130, 50))
@@ -1241,7 +1425,8 @@ tpChestBtn.MouseButton1Click:Connect(function()
     local inst = getCI(S.selChest)
     if #inst == 0 then return end
     S.chIdx = math.clamp(S.chIdx, 1, #inst)
-    tpTo(inst[S.chIdx]) updateChStatus()
+    tpTo(inst[S.chIdx])
+    updateChStatus()
 end)
 
 local navFrame = Instance.new("Frame", ChestTab)
@@ -1254,7 +1439,9 @@ prevChBtn.Size = UDim2.new(0.48, -3, 1, 0)
 prevChBtn.BackgroundColor3 = Color3.fromRGB(100, 80, 50)
 prevChBtn.Text = "◀ Previous"
 prevChBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-prevChBtn.TextSize = 11 prevChBtn.Font = Enum.Font.GothamBold prevChBtn.BorderSizePixel = 0
+prevChBtn.TextSize = 11
+prevChBtn.Font = Enum.Font.GothamBold
+prevChBtn.BorderSizePixel = 0
 Instance.new("UICorner", prevChBtn).CornerRadius = UDim.new(0, 8)
 
 local nextChBtn = Instance.new("TextButton", navFrame)
@@ -1263,20 +1450,29 @@ nextChBtn.Position = UDim2.new(0.52, 3, 0, 0)
 nextChBtn.BackgroundColor3 = Color3.fromRGB(100, 80, 50)
 nextChBtn.Text = "Next ▶"
 nextChBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-nextChBtn.TextSize = 11 nextChBtn.Font = Enum.Font.GothamBold nextChBtn.BorderSizePixel = 0
+nextChBtn.TextSize = 11
+nextChBtn.Font = Enum.Font.GothamBold
+nextChBtn.BorderSizePixel = 0
 Instance.new("UICorner", nextChBtn).CornerRadius = UDim.new(0, 8)
 
 prevChBtn.MouseButton1Click:Connect(function()
     if not S.selChest then return end
-    local inst = getCI(S.selChest) if #inst == 0 then return end
-    S.chIdx = S.chIdx - 1 if S.chIdx < 1 then S.chIdx = #inst end
-    tpTo(inst[S.chIdx]) updateChStatus()
+    local inst = getCI(S.selChest)
+    if #inst == 0 then return end
+    S.chIdx = S.chIdx - 1
+    if S.chIdx < 1 then S.chIdx = #inst end
+    tpTo(inst[S.chIdx])
+    updateChStatus()
 end)
+
 nextChBtn.MouseButton1Click:Connect(function()
     if not S.selChest then return end
-    local inst = getCI(S.selChest) if #inst == 0 then return end
-    S.chIdx = S.chIdx + 1 if S.chIdx > #inst then S.chIdx = 1 end
-    tpTo(inst[S.chIdx]) updateChStatus()
+    local inst = getCI(S.selChest)
+    if #inst == 0 then return end
+    S.chIdx = S.chIdx + 1
+    if S.chIdx > #inst then S.chIdx = 1 end
+    tpTo(inst[S.chIdx])
+    updateChStatus()
 end)
 
 -- ============================================
@@ -1284,25 +1480,184 @@ end)
 -- ============================================
 local IslTab = createTab("Islands", "🏝️")
 
-mkSection(IslTab, "AUTO EXPLORE")
+mkSection(IslTab, "AUTO EXPLORE (DEEP SCAN)")
 
-local exploreBtn = mkButton(IslTab, "🔍 Explore All Islands", Color3.fromRGB(80, 150, 200))
+local exploreBtn = mkButton(IslTab, "🔍 Deep Explore All Islands", Color3.fromRGB(80, 150, 200))
 local exploreStatus = Instance.new("TextLabel", IslTab)
-exploreStatus.Size = UDim2.new(1, 0, 0, 18)
+exploreStatus.Size = UDim2.new(1, 0, 0, 28)
 exploreStatus.BackgroundTransparency = 1
-exploreStatus.Text = "Status: Ready | Live + 💾Cache shown"
+exploreStatus.Text = "Status: Ready\n💡 Teleports to each island to load Keys/NPCs/Tablets/Bosses"
 exploreStatus.TextColor3 = Color3.fromRGB(150, 200, 255)
-exploreStatus.TextSize = 10 exploreStatus.Font = Enum.Font.Gotham
+exploreStatus.TextSize = 10
+exploreStatus.Font = Enum.Font.Gotham
+exploreStatus.TextWrapped = true
 exploreStatus.LayoutOrder = nxtLO(IslTab)
 
+-- ============================================
+-- DEEP EXPLORE FUNCTION (FIXED)
+-- Teleport player to each island → force streaming → scan special targets
+-- ============================================
+local function deepExploreAllIslands(statusCallback)
+    if S.exploring then return end
+    S.exploring = true
+
+    local char = player.Character
+    if not char then S.exploring = false return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then S.exploring = false return end
+
+    -- Save original position
+    local originalCF = hrp.CFrame
+
+    -- Step 1: Initial scan
+    if statusCallback then statusCallback("Step 1: Initial scan...") end
+    scanIslands()
+    scanSpecialTargets()
+    autoCacheTargets()
+
+    -- Step 2: Collect all island positions (live + cached)
+    local visitList = {}
+    local visited = {}
+
+    local ic = workspace:FindFirstChild("IslandContainer")
+    if ic then
+        for _, isl in pairs(ic:GetChildren()) do
+            if not visited[isl.Name] then
+                local pos = getObjPos(isl)
+                if pos then
+                    table.insert(visitList, {name = isl.Name, pos = pos})
+                    visited[isl.Name] = true
+                end
+            end
+        end
+    end
+
+    -- Also add cached islands not yet in live
+    for name, data in pairs(S.cachedIslands) do
+        if not visited[name] then
+            local pos = type(data) == "table" and data.Position or data
+            if pos then
+                table.insert(visitList, {name = name, pos = pos})
+                visited[name] = true
+            end
+        end
+    end
+
+    -- Step 3: If no islands found at all, do grid scan first
+    if #visitList == 0 then
+        if statusCallback then statusCallback("No islands found, grid scanning...") end
+        local step = 600
+        for x = -4000, 4000, step do
+            for z = -4000, 4000, step do
+                if not S.exploring then break end
+                char = player.Character
+                if not char then break end
+                hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then break end
+                hrp.CFrame = CFrame.new(x, 300, z)
+                task.wait(0.3)
+                scanIslands()
+                autoCacheTargets()
+            end
+            if not S.exploring then break end
+        end
+        -- Rebuild visit list after grid scan
+        ic = workspace:FindFirstChild("IslandContainer")
+        if ic then
+            for _, isl in pairs(ic:GetChildren()) do
+                if not visited[isl.Name] then
+                    local pos = getObjPos(isl)
+                    if pos then
+                        table.insert(visitList, {name = isl.Name, pos = pos})
+                        visited[isl.Name] = true
+                    end
+                end
+            end
+        end
+    end
+
+    -- Step 4: DEEP VISIT - Teleport player to EACH island
+    -- This forces streaming to load children (Keys, NPCs, Tablets, Bosses)
+    local totalIslands = #visitList
+    for i, info in ipairs(visitList) do
+        if not S.exploring then break end
+
+        if statusCallback then
+            statusCallback(string.format("Visiting %d/%d: %s...", i, totalIslands, info.name))
+        end
+
+        -- Teleport player near the island
+        char = player.Character
+        if not char then break end
+        hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then break end
+
+        hrp.CFrame = CFrame.new(info.pos.X, info.pos.Y + 50, info.pos.Z)
+        task.wait(0.8) -- Wait for streaming to load island children
+
+        -- Now scan special targets (Keys, Survivors, Tablets, Bosses)
+        scanIslands()
+        scanSpecialTargets()
+        autoCacheTargets()
+
+        -- Extra: walk around the island slightly to trigger more streaming
+        for offset = 1, 3 do
+            if not S.exploring then break end
+            char = player.Character
+            if not char then break end
+            hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then break end
+
+            local offsets = {
+                Vector3.new(40, 20, 0),
+                Vector3.new(-40, 20, 0),
+                Vector3.new(0, 20, 40),
+            }
+            hrp.CFrame = CFrame.new(info.pos + offsets[offset])
+            task.wait(0.4)
+            scanSpecialTargets()
+            autoCacheTargets()
+        end
+    end
+
+    -- Step 5: Return player to original position
+    char = player.Character
+    if char then
+        hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = originalCF
+        end
+    end
+
+    S.exploring = false
+
+    if statusCallback then
+        statusCallback(string.format(
+            "✅ Done! 🏝️%d 🗝️%d 🧑%d 📜%d 👹%d",
+            #S.ILIST + (function() local c=0 for _ in pairs(S.cachedIslands) do c=c+1 end return c end)(),
+            #S.keysList + (function() local c=0 for _ in pairs(S.cachedKeys) do c=c+1 end return c end)(),
+            #S.survList + (function() local c=0 for _ in pairs(S.cachedSurv) do c=c+1 end return c end)(),
+            #S.tabList + (function() local c=0 for _ in pairs(S.cachedTab) do c=c+1 end return c end)(),
+            #S.bossList + (function() local c=0 for _ in pairs(S.cachedBoss) do c=c+1 end return c end)()
+        ))
+    end
+end
+
 exploreBtn.MouseButton1Click:Connect(function()
-    if S.exploring then exploreStatus.Text = "⚠️ Already exploring..." return end
+    if S.exploring then
+        exploreStatus.Text = "⚠️ Already exploring..."
+        return
+    end
     task.spawn(function()
-        exploreBtn.Text = "🔄 Exploring..."
+        exploreBtn.Text = "🔄 Deep Exploring..."
         exploreBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
-        exploreAllIslands(function(msg) exploreStatus.Text = msg end)
-        exploreBtn.Text = "🔍 Explore All Islands"
+
+        deepExploreAllIslands(function(msg) exploreStatus.Text = msg end)
+
+        exploreBtn.Text = "🔍 Deep Explore All Islands"
         exploreBtn.BackgroundColor3 = Color3.fromRGB(80, 150, 200)
+
+        -- Refresh all dropdowns
         if islDropdown then islDropdown.refresh(getMergedList(S.ILIST, S.cachedIslands)) end
         if keyDropdown then keyDropdown.refresh(getMergedList(S.keysList, S.cachedKeys)) end
         if survDropdown then survDropdown.refresh(getMergedList(S.survList, S.cachedSurv)) end
@@ -1311,47 +1666,86 @@ exploreBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
+-- Stop explore button
+local stopExploreBtn = mkButton(IslTab, "⛔ Stop Exploring", Color3.fromRGB(180, 60, 60))
+stopExploreBtn.MouseButton1Click:Connect(function()
+    S.exploring = false
+    exploreStatus.Text = "⛔ Stopped by user"
+end)
+
 mkSection(IslTab, "ALL ISLANDS")
-islDropdown = mkDropdown(IslTab, "Select Island", "🏝️", getMergedList(S.ILIST, S.cachedIslands), function(v) S.selIsland = v S.islIdx = 1 end)
+islDropdown = mkDropdown(IslTab, "Select Island", "🏝️",
+    getMergedList(S.ILIST, S.cachedIslands),
+    function(v) S.selIsland = v S.islIdx = 1 end
+)
+
 local tpIslBtn = mkButton(IslTab, "🏃 TP to Island", Color3.fromRGB(60, 140, 100))
 tpIslBtn.MouseButton1Click:Connect(function()
     if not S.selIsland then return end
     local name = stripCache(S.selIsland)
     local inst = getII(name)
-    if #inst > 0 then tpTo(inst[1])
+    if #inst > 0 then
+        tpTo(inst[1])
     else
         local pos = S.cachedIslands[name]
         if pos then
             if type(pos) == "table" then pos = pos.Position end
             local char = player.Character
-            if char then local hrp = char:FindFirstChild("HumanoidRootPart") if hrp then hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0)) end end
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp and pos then
+                    hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+                end
+            end
         end
     end
 end)
 
 mkSection(IslTab, "🗝️ STRONGHOLD KEYS")
-keyDropdown = mkDropdown(IslTab, "Select Key", "🗝️", getMergedList(S.keysList, S.cachedKeys), function(v) S.selKey = v end)
+keyDropdown = mkDropdown(IslTab, "Select Key", "🗝️",
+    getMergedList(S.keysList, S.cachedKeys),
+    function(v) S.selKey = v end
+)
 local tpKeyBtn = mkButton(IslTab, "🏃 TP to Key", Color3.fromRGB(150, 150, 60))
-tpKeyBtn.MouseButton1Click:Connect(function() if S.selKey then tpToTarget(S.selKey, S.keysMap, S.cachedKeys) end end)
+tpKeyBtn.MouseButton1Click:Connect(function()
+    if S.selKey then tpToTarget(S.selKey, S.keysMap, S.cachedKeys) end
+end)
 
 mkSection(IslTab, "🧑 TRAPPED SURVIVORS")
-survDropdown = mkDropdown(IslTab, "Select Survivor", "🧑", getMergedList(S.survList, S.cachedSurv), function(v) S.selSurvivor = v end)
+survDropdown = mkDropdown(IslTab, "Select Survivor", "🧑",
+    getMergedList(S.survList, S.cachedSurv),
+    function(v) S.selSurvivor = v end
+)
 local tpSurvBtn = mkButton(IslTab, "🏃 TP to Survivor", Color3.fromRGB(80, 150, 100))
-tpSurvBtn.MouseButton1Click:Connect(function() if S.selSurvivor then tpToTarget(S.selSurvivor, S.survMap, S.cachedSurv) end end)
+tpSurvBtn.MouseButton1Click:Connect(function()
+    if S.selSurvivor then tpToTarget(S.selSurvivor, S.survMap, S.cachedSurv) end
+end)
 
 mkSection(IslTab, "📜 ANCIENT TABLETS")
-tabDropdown = mkDropdown(IslTab, "Select Tablet", "📜", getMergedList(S.tabList, S.cachedTab), function(v) S.selTablet = v end)
+tabDropdown = mkDropdown(IslTab, "Select Tablet", "📜",
+    getMergedList(S.tabList, S.cachedTab),
+    function(v) S.selTablet = v end
+)
 local tpTabBtn = mkButton(IslTab, "🏃 TP to Tablet", Color3.fromRGB(120, 100, 150))
-tpTabBtn.MouseButton1Click:Connect(function() if S.selTablet then tpToTarget(S.selTablet, S.tabMap, S.cachedTab) end end)
+tpTabBtn.MouseButton1Click:Connect(function()
+    if S.selTablet then tpToTarget(S.selTablet, S.tabMap, S.cachedTab) end
+end)
 
 mkSection(IslTab, "👹 BOSS LOCATIONS")
-bossDropdown = mkDropdown(IslTab, "Select Boss", "👹", getMergedList(S.bossList, S.cachedBoss), function(v) S.selBoss = v end)
+bossDropdown = mkDropdown(IslTab, "Select Boss", "👹",
+    getMergedList(S.bossList, S.cachedBoss),
+    function(v) S.selBoss = v end
+)
 local tpBossBtn = mkButton(IslTab, "🏃 TP to Boss", Color3.fromRGB(180, 60, 60))
-tpBossBtn.MouseButton1Click:Connect(function() if S.selBoss then tpToTarget(S.selBoss, S.bossMap, S.cachedBoss) end end)
+tpBossBtn.MouseButton1Click:Connect(function()
+    if S.selBoss then tpToTarget(S.selBoss, S.bossMap, S.cachedBoss) end
+end)
 
 local refreshAllBtn = mkButton(IslTab, "🔄 Refresh All Lists", Color3.fromRGB(50, 130, 80))
 refreshAllBtn.MouseButton1Click:Connect(function()
-    scanIslands() scanSpecialTargets() autoCacheTargets()
+    scanIslands()
+    scanSpecialTargets()
+    autoCacheTargets()
     islDropdown.refresh(getMergedList(S.ILIST, S.cachedIslands))
     keyDropdown.refresh(getMergedList(S.keysList, S.cachedKeys))
     survDropdown.refresh(getMergedList(S.survList, S.cachedSurv))
@@ -1359,6 +1753,7 @@ refreshAllBtn.MouseButton1Click:Connect(function()
     bossDropdown.refresh(getMergedList(S.bossList, S.cachedBoss))
 end)
 
+-- Auto refresh island dropdowns
 task.spawn(function()
     while SG and SG.Parent do
         task.wait(2)
@@ -1380,75 +1775,140 @@ mkSection(CombatTab, "AUTO FIRE")
 
 local afTgl = mkToggle(CombatTab, "Auto Fire Creature", "🔫")
 afTgl.button.MouseButton1Click:Connect(function()
-    S.autoFireOn = not S.autoFireOn afTgl.setState(S.autoFireOn)
+    S.autoFireOn = not S.autoFireOn
+    afTgl.setState(S.autoFireOn)
     if S.autoFireOn then
         if S.autoFireRun then return end
-        S.autoFireRun = true S.fireCnt = 0
+        S.autoFireRun = true
+        S.fireCnt = 0
         coroutine.wrap(function()
             if not RFunc then findRemotes() end
-            if not RFunc then afTgl.count.Text = "❌ No remote!" S.autoFireRun = false S.autoFireOn = false afTgl.setState(false) return end
+            if not RFunc then
+                afTgl.count.Text = "❌ No remote!"
+                S.autoFireRun = false
+                S.autoFireOn = false
+                afTgl.setState(false)
+                return
+            end
             while S.autoFireOn and S.autoFireRun do
-                local cr, dist = getNearest() local gun, handle = getGun()
-                if not gun then afTgl.count.Text = "⚠️ Equip gun!" task.wait(0.5) continue end
-                if not cr then afTgl.count.Text = "Shots: " .. S.fireCnt task.wait(0.3) continue end
-                local cPos = getCPos(cr) if not cPos then task.wait(0.1) continue end
+                local cr, dist = getNearest()
+                local gun, handle = getGun()
+                if not gun then
+                    afTgl.count.Text = "⚠️ Equip gun!"
+                    task.wait(0.5)
+                    continue
+                end
+                if not cr then
+                    afTgl.count.Text = "Shots: " .. S.fireCnt
+                    task.wait(0.3)
+                    continue
+                end
+                local cPos = getCPos(cr)
+                if not cPos then task.wait(0.1) continue end
                 local ok = smartFire(gun, handle, cPos)
-                if ok then S.fireCnt = S.fireCnt + 1 afTgl.count.Text = "Shots: " .. S.fireCnt .. " | " .. cr.Name end
+                if ok then
+                    S.fireCnt = S.fireCnt + 1
+                    afTgl.count.Text = "Shots: " .. S.fireCnt .. " | " .. cr.Name
+                end
                 task.wait(S.fireDelay)
             end
             S.autoFireRun = false
         end)()
-    else S.autoFireOn = false S.autoFireRun = false end
+    else
+        S.autoFireOn = false
+        S.autoFireRun = false
+    end
 end)
 
 local fdInp = mkInput(CombatTab, "Fire Delay:", "🔫", S.fireDelay, "s")
-fdInp.FocusLost:Connect(function() local n = tonumber(fdInp.Text) if n and n >= 0.01 then S.fireDelay = n else fdInp.Text = tostring(S.fireDelay) end end)
+fdInp.FocusLost:Connect(function()
+    local n = tonumber(fdInp.Text)
+    if n and n >= 0.01 then S.fireDelay = n
+    else fdInp.Text = tostring(S.fireDelay) end
+end)
 
 local frInp = mkInput(CombatTab, "Fire Range:", "🎯", S.fireRange, "st")
-frInp.FocusLost:Connect(function() local n = tonumber(frInp.Text) if n and n > 0 then S.fireRange = n else frInp.Text = tostring(S.fireRange) end end)
+frInp.FocusLost:Connect(function()
+    local n = tonumber(frInp.Text)
+    if n and n > 0 then S.fireRange = n
+    else frInp.Text = tostring(S.fireRange) end
+end)
 
 mkSection(CombatTab, "BUFFS")
 
 local iaTgl = mkToggle(CombatTab, "Inf Ammo (No Reload)", "♾️")
 iaTgl.button.MouseButton1Click:Connect(function()
-    S.infAmmoOn = not S.infAmmoOn iaTgl.setState(S.infAmmoOn)
+    S.infAmmoOn = not S.infAmmoOn
+    iaTgl.setState(S.infAmmoOn)
     if S.infAmmoOn then
-        if S.infAmmoRun then return end S.infAmmoRun = true
+        if S.infAmmoRun then return end
+        S.infAmmoRun = true
         coroutine.wrap(function()
             while S.infAmmoOn and S.infAmmoRun do
                 local c = 0
-                local function proc(ct) if not ct then return end for _, t in pairs(ct:GetChildren()) do if t:IsA("Tool") and (t:GetAttribute("IsGun") or t:GetAttribute("AmmoType")) then pcall(function() if t:GetAttribute("FiredConseq") ~= nil then t:SetAttribute("FiredConseq", 0) end if t:GetAttribute("Reloading") ~= nil then t:SetAttribute("Reloading", false) end end) c = c + 1 end end end
-                proc(player.Character) proc(player:FindFirstChild("Backpack"))
+                local function proc(ct)
+                    if not ct then return end
+                    for _, t in pairs(ct:GetChildren()) do
+                        if t:IsA("Tool") and (t:GetAttribute("IsGun") or t:GetAttribute("AmmoType")) then
+                            pcall(function()
+                                if t:GetAttribute("FiredConseq") ~= nil then t:SetAttribute("FiredConseq", 0) end
+                                if t:GetAttribute("Reloading") ~= nil then t:SetAttribute("Reloading", false) end
+                            end)
+                            c = c + 1
+                        end
+                    end
+                end
+                proc(player.Character)
+                proc(player:FindFirstChild("Backpack"))
                 iaTgl.count.Text = c .. " guns | ∞"
                 task.wait(0.05)
             end
             S.infAmmoRun = false
         end)()
-    else S.infAmmoOn = false S.infAmmoRun = false end
+    else
+        S.infAmmoOn = false
+        S.infAmmoRun = false
+    end
 end)
 
 local mdTgl = mkToggle(CombatTab, "Max Damage (999)", "💥")
 mdTgl.button.MouseButton1Click:Connect(function()
-    S.maxDmgOn = not S.maxDmgOn mdTgl.setState(S.maxDmgOn)
+    S.maxDmgOn = not S.maxDmgOn
+    mdTgl.setState(S.maxDmgOn)
     if S.maxDmgOn then
-        if S.maxDmgRun then return end S.maxDmgRun = true
+        if S.maxDmgRun then return end
+        S.maxDmgRun = true
         coroutine.wrap(function()
             while S.maxDmgOn and S.maxDmgRun do
                 local c = 0
-                local function proc(ct) if not ct then return end for _, t in pairs(ct:GetChildren()) do if t:IsA("Tool") and t:GetAttribute("Damage") ~= nil then pcall(function() t:SetAttribute("Damage", 999) end) c = c + 1 end end end
-                proc(player.Character) proc(player:FindFirstChild("Backpack"))
+                local function proc(ct)
+                    if not ct then return end
+                    for _, t in pairs(ct:GetChildren()) do
+                        if t:IsA("Tool") and t:GetAttribute("Damage") ~= nil then
+                            pcall(function() t:SetAttribute("Damage", 999) end)
+                            c = c + 1
+                        end
+                    end
+                end
+                proc(player.Character)
+                proc(player:FindFirstChild("Backpack"))
                 mdTgl.count.Text = c .. " weapons | 999"
                 task.wait(0.1)
             end
             S.maxDmgRun = false
         end)()
-    else S.maxDmgOn = false S.maxDmgRun = false end
+    else
+        S.maxDmgOn = false
+        S.maxDmgRun = false
+    end
 end)
 
 mkSection(CombatTab, "CREATURE CONTROL")
+
 local wrTgl = mkToggle(CombatTab, "Freeze Wraith", "👻")
 wrTgl.button.MouseButton1Click:Connect(function()
-    S.frzWraithOn = not S.frzWraithOn wrTgl.setState(S.frzWraithOn)
+    S.frzWraithOn = not S.frzWraithOn
+    wrTgl.setState(S.frzWraithOn)
     if S.frzWraithOn then
         if not S.frzWraithRun then
             S.frzWraithRun = true
@@ -1461,7 +1921,11 @@ wrTgl.button.MouseButton1Click:Connect(function()
                 S.frzWraithRun = false
             end)()
         end
-    else S.frzWraithOn = false unfreezeWraiths() wrTgl.count.Text = "Released" end
+    else
+        S.frzWraithOn = false
+        unfreezeWraiths()
+        wrTgl.count.Text = "Released"
+    end
 end)
 
 -- ============================================
@@ -1472,37 +1936,74 @@ mkSection(SurvTab, "AUTO CONSUME")
 
 local eatTgl = mkToggle(SurvTab, "Auto Eat/Heal", "🍖")
 eatTgl.button.MouseButton1Click:Connect(function()
-    S.autoFoodOn = not S.autoFoodOn eatTgl.setState(S.autoFoodOn)
+    S.autoFoodOn = not S.autoFoodOn
+    eatTgl.setState(S.autoFoodOn)
     if S.autoFoodOn then
-        if S.autoFoodRun then return end S.autoFoodRun = true
+        if S.autoFoodRun then return end
+        S.autoFoodRun = true
         coroutine.wrap(function()
             while S.autoFoodOn and S.autoFoodRun do
                 local food = player:GetAttribute("Food") or 100
                 local hp = getPlayerHP()
-                if hp < S.hpThresh then eatTgl.count.Text = "❤️ Heal..." useConsumable(HP_ITEMS, "hp") task.wait(1)
-                elseif food < S.foodThresh then eatTgl.count.Text = "🍖 Eat..." useConsumable(FOOD_ITEMS, "food") task.wait(1)
-                else eatTgl.count.Text = "🍖" .. math.floor(food) .. "% ❤️" .. math.floor(hp) .. "%" end
+                if hp < S.hpThresh then
+                    eatTgl.count.Text = "❤️ Heal..."
+                    useConsumable(HP_ITEMS, "hp")
+                    task.wait(1)
+                elseif food < S.foodThresh then
+                    eatTgl.count.Text = "🍖 Eat..."
+                    useConsumable(FOOD_ITEMS, "food")
+                    task.wait(1)
+                else
+                    eatTgl.count.Text = "🍖" .. math.floor(food) .. "% ❤️" .. math.floor(hp) .. "%"
+                end
                 task.wait(1)
             end
             S.autoFoodRun = false
         end)()
-    else S.autoFoodOn = false S.autoFoodRun = false pcall(function() local c = player.Character if c then local h = c:FindFirstChildOfClass("Humanoid") if h then h:UnequipTools() end end end) end
+    else
+        S.autoFoodOn = false
+        S.autoFoodRun = false
+        pcall(function()
+            local c = player.Character
+            if c then
+                local h = c:FindFirstChildOfClass("Humanoid")
+                if h then h:UnequipTools() end
+            end
+        end)
+    end
 end)
 
 local ftInp = mkInput(SurvTab, "Eat Food <", "🍖", S.foodThresh, "%")
-ftInp.FocusLost:Connect(function() local n = tonumber(ftInp.Text) if n and n > 0 and n <= 100 then S.foodThresh = n else ftInp.Text = tostring(S.foodThresh) end end)
+ftInp.FocusLost:Connect(function()
+    local n = tonumber(ftInp.Text)
+    if n and n > 0 and n <= 100 then S.foodThresh = n
+    else ftInp.Text = tostring(S.foodThresh) end
+end)
 
 local htInp = mkInput(SurvTab, "Heal HP <", "❤️", S.hpThresh, "%")
-htInp.FocusLost:Connect(function() local n = tonumber(htInp.Text) if n and n > 0 and n <= 100 then S.hpThresh = n else htInp.Text = tostring(S.hpThresh) end end)
+htInp.FocusLost:Connect(function()
+    local n = tonumber(htInp.Text)
+    if n and n > 0 and n <= 100 then S.hpThresh = n
+    else htInp.Text = tostring(S.hpThresh) end
+end)
 
 local infoFrame = Instance.new("Frame", SurvTab)
-infoFrame.Size = UDim2.new(1, 0, 0, 42) infoFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45) infoFrame.BorderSizePixel = 0
-infoFrame.LayoutOrder = nxtLO(SurvTab) Instance.new("UICorner", infoFrame).CornerRadius = UDim.new(0, 8)
+infoFrame.Size = UDim2.new(1, 0, 0, 42)
+infoFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+infoFrame.BorderSizePixel = 0
+infoFrame.LayoutOrder = nxtLO(SurvTab)
+Instance.new("UICorner", infoFrame).CornerRadius = UDim.new(0, 8)
+
 local infoLbl = Instance.new("TextLabel", infoFrame)
-infoLbl.Size = UDim2.new(1, -16, 1, -8) infoLbl.Position = UDim2.new(0, 8, 0, 4) infoLbl.BackgroundTransparency = 1
+infoLbl.Size = UDim2.new(1, -16, 1, -8)
+infoLbl.Position = UDim2.new(0, 8, 0, 4)
+infoLbl.BackgroundTransparency = 1
 infoLbl.Text = "🍖 Food: Chowder → Alien Soup\n❤️ HP: Bandage → Medkit"
-infoLbl.TextColor3 = Color3.fromRGB(180, 180, 200) infoLbl.TextSize = 10 infoLbl.Font = Enum.Font.Gotham
-infoLbl.TextXAlignment = Enum.TextXAlignment.Left infoLbl.TextYAlignment = Enum.TextYAlignment.Top
+infoLbl.TextColor3 = Color3.fromRGB(180, 180, 200)
+infoLbl.TextSize = 10
+infoLbl.Font = Enum.Font.Gotham
+infoLbl.TextXAlignment = Enum.TextXAlignment.Left
+infoLbl.TextYAlignment = Enum.TextYAlignment.Top
 
 -- ============================================
 -- TAB: FISHING
@@ -1512,71 +2013,150 @@ mkSection(FishTab, "INSTANT FISHING V1")
 
 local fishTgl = mkToggle(FishTab, "Instant Fishing V1", "🎣")
 fishTgl.button.MouseButton1Click:Connect(function()
-    S.autoFishOn = not S.autoFishOn fishTgl.setState(S.autoFishOn)
+    S.autoFishOn = not S.autoFishOn
+    fishTgl.setState(S.autoFishOn)
     if S.autoFishOn then
-        if S.autoFishRun then return end S.autoFishRun = true S.fishCnt = 0
+        if S.autoFishRun then return end
+        S.autoFishRun = true
+        S.fishCnt = 0
         coroutine.wrap(function()
             if not RFunc or not REvt then findRemotes() end
-            if not RFunc or not REvt then fishTgl.count.Text = "❌ No remote" S.autoFishRun = false S.autoFishOn = false fishTgl.setState(false) return end
+            if not RFunc or not REvt then
+                fishTgl.count.Text = "❌ No remote"
+                S.autoFishRun = false
+                S.autoFishOn = false
+                fishTgl.setState(false)
+                return
+            end
             local rod = findFishingRod()
-            if not rod then fishTgl.count.Text = "⚠️ No Rod!" S.autoFishRun = false S.autoFishOn = false fishTgl.setState(false) return end
+            if not rod then
+                fishTgl.count.Text = "⚠️ No Rod!"
+                S.autoFishRun = false
+                S.autoFishOn = false
+                fishTgl.setState(false)
+                return
+            end
             while S.autoFishOn and S.autoFishRun do
                 local ok = doInstantFishing()
-                if ok then S.fishCnt = S.fishCnt + 1 fishTgl.count.Text = "Fish: " .. S.fishCnt end
+                if ok then
+                    S.fishCnt = S.fishCnt + 1
+                    fishTgl.count.Text = "Fish: " .. S.fishCnt
+                end
                 task.wait(S.fishDelay)
             end
             S.autoFishRun = false
         end)()
-    else S.autoFishOn = false S.autoFishRun = false end
+    else
+        S.autoFishOn = false
+        S.autoFishRun = false
+    end
 end)
 
 local fdInp2 = mkInput(FishTab, "V1 Delay:", "⏱️", S.fishDelay, "s")
-fdInp2.FocusLost:Connect(function() local n = tonumber(fdInp2.Text) if n and n >= 0.1 then S.fishDelay = n else fdInp2.Text = tostring(S.fishDelay) end end)
+fdInp2.FocusLost:Connect(function()
+    local n = tonumber(fdInp2.Text)
+    if n and n >= 0.1 then S.fishDelay = n
+    else fdInp2.Text = tostring(S.fishDelay) end
+end)
 
 mkSection(FishTab, "🧪 FISHING V2")
 
 local fishResDropdown = mkDropdown(FishTab, "Select Resource V2", "🎣", S.RLIST, function(v) S.selFishRes = v end)
 
 local fishRefreshBtn = mkButton(FishTab, "🔄 Refresh Resources", Color3.fromRGB(50, 130, 80))
-fishRefreshBtn.MouseButton1Click:Connect(function() scanRes() fishResDropdown.refresh(S.RLIST) end)
+fishRefreshBtn.MouseButton1Click:Connect(function()
+    scanRes()
+    fishResDropdown.refresh(S.RLIST)
+end)
 
-task.spawn(function() while SG and SG.Parent do task.wait(2) pcall(function() fishResDropdown.refresh(S.RLIST) end) end end)
+task.spawn(function()
+    while SG and SG.Parent do
+        task.wait(2)
+        pcall(function() fishResDropdown.refresh(S.RLIST) end)
+    end
+end)
 
 local fishV2Tgl = mkToggle(FishTab, "Instant Fishing V2", "🧪")
 fishV2Tgl.button.MouseButton1Click:Connect(function()
-    S.autoFishV2On = not S.autoFishV2On fishV2Tgl.setState(S.autoFishV2On)
+    S.autoFishV2On = not S.autoFishV2On
+    fishV2Tgl.setState(S.autoFishV2On)
     if S.autoFishV2On then
-        if S.autoFishV2Run then return end S.autoFishV2Run = true S.fishV2Cnt = 0
+        if S.autoFishV2Run then return end
+        S.autoFishV2Run = true
+        S.fishV2Cnt = 0
         coroutine.wrap(function()
             if not RFunc or not REvt then findRemotes() end
-            if not RFunc or not REvt then fishV2Tgl.count.Text = "❌ No remote" S.autoFishV2Run = false S.autoFishV2On = false fishV2Tgl.setState(false) return end
-            if not S.selFishRes then fishV2Tgl.count.Text = "⚠️ Select resource!" S.autoFishV2Run = false S.autoFishV2On = false fishV2Tgl.setState(false) return end
+            if not RFunc or not REvt then
+                fishV2Tgl.count.Text = "❌ No remote"
+                S.autoFishV2Run = false
+                S.autoFishV2On = false
+                fishV2Tgl.setState(false)
+                return
+            end
+            if not S.selFishRes then
+                fishV2Tgl.count.Text = "⚠️ Select resource!"
+                S.autoFishV2Run = false
+                S.autoFishV2On = false
+                fishV2Tgl.setState(false)
+                return
+            end
             local rod = findFishingRod()
-            if not rod then fishV2Tgl.count.Text = "⚠️ No Rod!" S.autoFishV2Run = false S.autoFishV2On = false fishV2Tgl.setState(false) return end
+            if not rod then
+                fishV2Tgl.count.Text = "⚠️ No Rod!"
+                S.autoFishV2Run = false
+                S.autoFishV2On = false
+                fishV2Tgl.setState(false)
+                return
+            end
             local char = player.Character
-            if char then local hum = char:FindFirstChildOfClass("Humanoid") if hum and rod.Parent ~= char then hum:EquipTool(rod) task.wait(0.5) end end
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and rod.Parent ~= char then
+                    hum:EquipTool(rod)
+                    task.wait(0.5)
+                end
+            end
             fishV2Tgl.count.Text = "🎣 " .. S.selFishRes
             while S.autoFishV2On and S.autoFishV2Run do
                 local ok = doFishingV2Loop()
-                if ok then S.fishV2Cnt = S.fishV2Cnt + 1 fishV2Tgl.count.Text = "V2: " .. S.fishV2Cnt end
+                if ok then
+                    S.fishV2Cnt = S.fishV2Cnt + 1
+                    fishV2Tgl.count.Text = "V2: " .. S.fishV2Cnt
+                end
                 task.wait(S.fishV2Delay)
             end
             S.autoFishV2Run = false
         end)()
-    else S.autoFishV2On = false S.autoFishV2Run = false end
+    else
+        S.autoFishV2On = false
+        S.autoFishV2Run = false
+    end
 end)
 
 local fdInp3 = mkInput(FishTab, "V2 Delay:", "⏱️", S.fishV2Delay, "s")
-fdInp3.FocusLost:Connect(function() local n = tonumber(fdInp3.Text) if n and n >= 0.1 then S.fishV2Delay = n else fdInp3.Text = tostring(S.fishV2Delay) end end)
+fdInp3.FocusLost:Connect(function()
+    local n = tonumber(fdInp3.Text)
+    if n and n >= 0.1 then S.fishV2Delay = n
+    else fdInp3.Text = tostring(S.fishV2Delay) end
+end)
 
 local v2Info = Instance.new("Frame", FishTab)
-v2Info.Size = UDim2.new(1, 0, 0, 60) v2Info.BackgroundColor3 = Color3.fromRGB(30, 30, 45) v2Info.BorderSizePixel = 0
-v2Info.LayoutOrder = nxtLO(FishTab) Instance.new("UICorner", v2Info).CornerRadius = UDim.new(0, 8)
+v2Info.Size = UDim2.new(1, 0, 0, 60)
+v2Info.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+v2Info.BorderSizePixel = 0
+v2Info.LayoutOrder = nxtLO(FishTab)
+Instance.new("UICorner", v2Info).CornerRadius = UDim.new(0, 8)
+
 local v2Lbl = Instance.new("TextLabel", v2Info)
-v2Lbl.Size = UDim2.new(1, -16, 1, -8) v2Lbl.Position = UDim2.new(0, 8, 0, 4) v2Lbl.BackgroundTransparency = 1
+v2Lbl.Size = UDim2.new(1, -16, 1, -8)
+v2Lbl.Position = UDim2.new(0, 8, 0, 4)
+v2Lbl.BackgroundTransparency = 1
 v2Lbl.Text = "V2 Flow:\n1. Equip Rod (once)\n2. Loop: Cast → FishPoof → GiveUpOwnership"
-v2Lbl.TextColor3 = Color3.fromRGB(180, 180, 200) v2Lbl.TextSize = 10 v2Lbl.Font = Enum.Font.Gotham
-v2Lbl.TextXAlignment = Enum.TextXAlignment.Left v2Lbl.TextYAlignment = Enum.TextYAlignment.Top
+v2Lbl.TextColor3 = Color3.fromRGB(180, 180, 200)
+v2Lbl.TextSize = 10
+v2Lbl.Font = Enum.Font.Gotham
+v2Lbl.TextXAlignment = Enum.TextXAlignment.Left
+v2Lbl.TextYAlignment = Enum.TextYAlignment.Top
 
 -- ============================================
 -- TAB: SETTINGS
@@ -1585,19 +2165,31 @@ local SetTab = createTab("Settings", "⚙️")
 mkSection(SetTab, "TP SETTINGS")
 
 local tpDistInp = mkInput(SetTab, "TP Distance:", "📏", S.tpDist, "st")
-tpDistInp.FocusLost:Connect(function() local n = tonumber(tpDistInp.Text) if n and n > 0 then S.tpDist = n else tpDistInp.Text = tostring(S.tpDist) end end)
+tpDistInp.FocusLost:Connect(function()
+    local n = tonumber(tpDistInp.Text)
+    if n and n > 0 then S.tpDist = n
+    else tpDistInp.Text = tostring(S.tpDist) end
+end)
 
 local tpDelayInp = mkInput(SetTab, "TP Delay:", "⏱️", S.tpDelay, "s")
-tpDelayInp.FocusLost:Connect(function() local n = tonumber(tpDelayInp.Text) if n and n >= 0.01 then S.tpDelay = n else tpDelayInp.Text = tostring(S.tpDelay) end end)
+tpDelayInp.FocusLost:Connect(function()
+    local n = tonumber(tpDelayInp.Text)
+    if n and n >= 0.01 then S.tpDelay = n
+    else tpDelayInp.Text = tostring(S.tpDelay) end
+end)
 
 mkSection(SetTab, "UI SETTINGS")
 
 local saveNowBtn = mkButton(SetTab, "💾 Save Position & Size", Color3.fromRGB(60, 130, 80))
 saveNowBtn.MouseButton1Click:Connect(function()
-    CONFIG.posX = MF.Position.X.Offset CONFIG.posY = MF.Position.Y.Offset
-    CONFIG.sizeW = MF.AbsoluteSize.X CONFIG.sizeH = MF.AbsoluteSize.Y
+    CONFIG.posX = MF.Position.X.Offset
+    CONFIG.posY = MF.Position.Y.Offset
+    CONFIG.sizeW = MF.AbsoluteSize.X
+    CONFIG.sizeH = MF.AbsoluteSize.Y
     saveConfig()
-    saveNowBtn.Text = "✅ Saved!" task.wait(1) saveNowBtn.Text = "💾 Save Position & Size"
+    saveNowBtn.Text = "✅ Saved!"
+    task.wait(1)
+    saveNowBtn.Text = "💾 Save Position & Size"
 end)
 
 local resetUIBtn = mkButton(SetTab, "🔄 Reset UI Position/Size", Color3.fromRGB(180, 130, 60))
@@ -1606,40 +2198,72 @@ resetUIBtn.MouseButton1Click:Connect(function()
     local vw, vh = getScreenSize()
     MF.Size = UDim2.new(0, w, 0, h)
     MF.Position = UDim2.new(0, (vw - w) / 2, 0, (vh - h) / 2)
-    CONFIG.posX = (vw - w) / 2 CONFIG.posY = (vh - h) / 2 CONFIG.sizeW = w CONFIG.sizeH = h
+    CONFIG.posX = (vw - w) / 2
+    CONFIG.posY = (vh - h) / 2
+    CONFIG.sizeW = w
+    CONFIG.sizeH = h
+    CONFIG.minimized = false
+    isMinimized = false
+    Content.Visible = true
+    TabBar.Visible = true
+    minBtn.Text = "—"
     saveConfig()
 end)
 
 mkSection(SetTab, "INFO")
 
 local infoParaFrame = Instance.new("Frame", SetTab)
-infoParaFrame.Size = UDim2.new(1, 0, 0, 80) infoParaFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45) infoParaFrame.BorderSizePixel = 0
-infoParaFrame.LayoutOrder = nxtLO(SetTab) Instance.new("UICorner", infoParaFrame).CornerRadius = UDim.new(0, 8)
+infoParaFrame.Size = UDim2.new(1, 0, 0, 90)
+infoParaFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+infoParaFrame.BorderSizePixel = 0
+infoParaFrame.LayoutOrder = nxtLO(SetTab)
+Instance.new("UICorner", infoParaFrame).CornerRadius = UDim.new(0, 8)
+
 local infoParaLbl = Instance.new("TextLabel", infoParaFrame)
-infoParaLbl.Size = UDim2.new(1, -16, 1, -8) infoParaLbl.Position = UDim2.new(0, 8, 0, 4) infoParaLbl.BackgroundTransparency = 1
-infoParaLbl.Text = "🪨 Backstreet Survival Hub v29\n\n💾 Auto-save posisi & ukuran\n🔍 Auto-cache lokasi island\n📱 Responsive: PC & Mobile"
-infoParaLbl.TextColor3 = Color3.fromRGB(180, 180, 200) infoParaLbl.TextSize = 10 infoParaLbl.Font = Enum.Font.Gotham
-infoParaLbl.TextXAlignment = Enum.TextXAlignment.Left infoParaLbl.TextYAlignment = Enum.TextYAlignment.Top
+infoParaLbl.Size = UDim2.new(1, -16, 1, -8)
+infoParaLbl.Position = UDim2.new(0, 8, 0, 4)
+infoParaLbl.BackgroundTransparency = 1
+infoParaLbl.Text = "🪨 Backstreet Survival Hub v29\n\n💾 Auto-save posisi & ukuran\n🔍 Deep Explore: TP ke setiap island\n     agar Key/NPC/Tablet/Boss terdeteksi\n⚡ Instant Interact: auto fire ProximityPrompts\n📱 Responsive: PC & Mobile"
+infoParaLbl.TextColor3 = Color3.fromRGB(180, 180, 200)
+infoParaLbl.TextSize = 10
+infoParaLbl.Font = Enum.Font.Gotham
+infoParaLbl.TextXAlignment = Enum.TextXAlignment.Left
+infoParaLbl.TextYAlignment = Enum.TextYAlignment.Top
+infoParaLbl.TextWrapped = true
 
 local destroyBtn = mkButton(SetTab, "🗑️ Destroy UI", Color3.fromRGB(180, 60, 60))
 destroyBtn.MouseButton1Click:Connect(function()
-    S.tpResOn = false S.tpLoop = false stopFL()
-    S.frzWraithOn = false unfreezeWraiths()
-    S.autoFireOn = false S.autoFireRun = false
-    S.infAmmoOn = false S.infAmmoRun = false
-    S.maxDmgOn = false S.maxDmgRun = false
-    S.autoFoodOn = false S.autoFoodRun = false
-    S.autoResOn = false S.autoResRun = false
-    S.autoFishOn = false S.autoFishRun = false
-    S.autoFishV2On = false S.autoFishV2Run = false
-    S.flyOn = false stopFly()
-    S.walkSpeedOn = false stopWalkSpeed()
+    S.tpResOn = false
+    S.tpLoop = false
+    stopFL()
+    S.frzWraithOn = false
+    unfreezeWraiths()
+    S.autoFireOn = false
+    S.autoFireRun = false
+    S.infAmmoOn = false
+    S.infAmmoRun = false
+    S.maxDmgOn = false
+    S.maxDmgRun = false
+    S.autoFoodOn = false
+    S.autoFoodRun = false
+    S.autoResOn = false
+    S.autoResRun = false
+    S.autoFishOn = false
+    S.autoFishRun = false
+    S.autoFishV2On = false
+    S.autoFishV2Run = false
+    instantInteractOn = false
+    S.flyOn = false
+    stopFly()
+    S.walkSpeedOn = false
+    stopWalkSpeed()
+    S.exploring = false
     pcall(function() FlyGui:Destroy() end)
     pcall(function() SG:Destroy() end)
 end)
 
 -- ============================================
--- INIT - IMPORTANT: Activate default tab AFTER all tabs created
+-- INIT - Activate default tab AFTER all tabs created
 -- ============================================
 task.wait(0.2)
 
@@ -1661,9 +2285,11 @@ if tabs[activeTabName] then
     S.activeTab = activeTabName
 end
 
--- Ensure Content is visible
-Content.Visible = true
-TabBar.Visible = true
+-- Ensure Content is visible (unless minimized)
+if not isMinimized then
+    Content.Visible = true
+    TabBar.Visible = true
+end
 
 -- Find remotes background
 task.spawn(function()
@@ -1684,4 +2310,4 @@ workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(functio
     end
 end)
 
-print("✅ v29 COMPLETE! Custom UI + All Tabs + Auto Cache")
+print("✅ v29 COMPLETE! Deep Explore + Instant Interact + Fixed UI")
