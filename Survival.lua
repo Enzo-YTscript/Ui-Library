@@ -354,8 +354,10 @@ local function doGiveUpOwnershipOnResource() if not REvt then return false end i
 local function doFishingV2Loop() doCast() task.wait(0.3) doFishPoof() task.wait(0.3) doGiveUpOwnershipOnResource() task.wait(0.2) return true end
 
 print("✅ v29 PART 1 loaded!")
+
 -- ============================================
--- v29 PART 2 - CUSTOM UI FRAMEWORK
+-- v29 PART 2 FIXED - CUSTOM UI FRAMEWORK
+-- Fix: Minimize, Resize, Responsive Mobile
 -- ============================================
 
 -- ============================================
@@ -425,22 +427,38 @@ S.gui.flyDownBtn.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInp
 S.gui.flyDownBtn.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then S.flyDown=false end end)
 
 -- ============================================
--- MAIN FRAME
+-- CLAMP POSITION & SIZE (FIXED - never overflow screen)
 -- ============================================
-local sw, sh = getScreenSize()
-
--- Ensure position is valid (in screen bounds)
 local function clampPos()
-    local w = CONFIG.sizeW or defW
-    local h = CONFIG.sizeH or defH
     local vw, vh = getScreenSize()
-    if not CONFIG.posX or CONFIG.posX < -w+50 then CONFIG.posX = (vw - w) / 2 end
-    if not CONFIG.posY or CONFIG.posY < 0 then CONFIG.posY = (vh - h) / 2 end
-    if CONFIG.posX > vw - 50 then CONFIG.posX = vw - w end
-    if CONFIG.posY > vh - 50 then CONFIG.posY = vh - h end
+
+    -- Clamp size DULU supaya tidak melebihi layar
+    if not CONFIG.sizeW or CONFIG.sizeW > vw - 20 then
+        CONFIG.sizeW = math.min(defW, vw - 20)
+    end
+    if not CONFIG.sizeH or CONFIG.sizeH > vh - 40 then
+        CONFIG.sizeH = math.min(defH, vh - 40)
+    end
+    if CONFIG.sizeW < 220 then CONFIG.sizeW = 220 end
+    if CONFIG.sizeH < 200 then CONFIG.sizeH = 200 end
+
+    local w = CONFIG.sizeW
+    local h = CONFIG.sizeH
+
+    -- Clamp position agar UI tetap dalam layar
+    if not CONFIG.posX then CONFIG.posX = (vw - w) / 2 end
+    if not CONFIG.posY then CONFIG.posY = (vh - h) / 2 end
+
+    if CONFIG.posX < 0 then CONFIG.posX = 0 end
+    if CONFIG.posY < 0 then CONFIG.posY = 0 end
+    if CONFIG.posX + w > vw then CONFIG.posX = math.max(0, vw - w) end
+    if CONFIG.posY + h > vh then CONFIG.posY = math.max(0, vh - h) end
 end
 clampPos()
 
+-- ============================================
+-- MAIN FRAME
+-- ============================================
 local MF = Instance.new("Frame", SG)
 MF.Name = "MainFrame"
 MF.Size = UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
@@ -453,10 +471,42 @@ MF.ZIndex = 10
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 12)
 local mfs = Instance.new("UIStroke", MF) mfs.Color = Color3.fromRGB(100, 200, 255) mfs.Thickness = 2
 
--- Min/Max size for resize
+-- ============================================
+-- DYNAMIC SIZE CONSTRAINT (Responsive to screen)
+-- ============================================
 local mfsz = Instance.new("UISizeConstraint", MF)
-mfsz.MinSize = Vector2.new(260, 300)
-mfsz.MaxSize = Vector2.new(500, 700)
+
+local function updateSizeConstraint()
+    local vw, vh = getScreenSize()
+    -- Min: cukup kecil untuk HP kecil
+    mfsz.MinSize = Vector2.new(220, 200)
+    -- Max: TIDAK BOLEH MELEBIHI LAYAR (margin 20px horizontal, 40px vertical)
+    mfsz.MaxSize = Vector2.new(math.max(vw - 20, 240), math.max(vh - 40, 220))
+end
+updateSizeConstraint()
+
+-- Auto update jika layar berubah (rotate HP dll)
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+    updateSizeConstraint()
+    -- Clamp current size juga
+    task.wait(0.1)
+    local vw, vh = getScreenSize()
+    local curW = MF.AbsoluteSize.X
+    local curH = MF.AbsoluteSize.Y
+    local newW = math.min(curW, vw - 20)
+    local newH = math.min(curH, vh - 40)
+    if newW ~= curW or newH ~= curH then
+        MF.Size = UDim2.new(0, newW, 0, newH)
+    end
+    -- Also clamp position
+    local posX = MF.Position.X.Offset
+    local posY = MF.Position.Y.Offset
+    if posX + newW > vw then posX = math.max(0, vw - newW) end
+    if posY + newH > vh then posY = math.max(0, vh - newH) end
+    if posX < 0 then posX = 0 end
+    if posY < 0 then posY = 0 end
+    MF.Position = UDim2.new(0, posX, 0, posY)
+end)
 
 -- ============================================
 -- TITLE BAR
@@ -581,7 +631,7 @@ local function createTab(name, icon)
     btn.ZIndex = 12
     btn.AutoButtonColor = false
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    
+
     -- Tab content frame
     local frame = Instance.new("ScrollingFrame", Content)
     frame.Name = name .. "Content"
@@ -595,20 +645,20 @@ local function createTab(name, icon)
     frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     frame.Visible = false
     frame.ZIndex = 11
-    
+
     local layout = Instance.new("UIListLayout", frame)
     layout.Padding = UDim.new(0, 6)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    
+
     local padd = Instance.new("UIPadding", frame)
     padd.PaddingTop = UDim.new(0, 5)
     padd.PaddingBottom = UDim.new(0, 20)
     padd.PaddingLeft = UDim.new(0, 8)
     padd.PaddingRight = UDim.new(0, 8)
-    
+
     tabs[name] = frame
     tabButtons[name] = btn
-    
+
     btn.MouseButton1Click:Connect(function()
         for n, t in pairs(tabs) do
             t.Visible = false
@@ -623,7 +673,7 @@ local function createTab(name, icon)
         CONFIG.activeTab = name
         saveConfig()
     end)
-    
+
     return frame
 end
 
@@ -660,7 +710,7 @@ local function mkToggle(parent, label, emoji)
     f.BorderSizePixel = 0
     f.LayoutOrder = nxtLO(parent)
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
-    
+
     local lb = Instance.new("TextLabel", f)
     lb.Size = UDim2.new(0.55, 0, 0, 20)
     lb.Position = UDim2.new(0, 12, 0, 6)
@@ -670,7 +720,7 @@ local function mkToggle(parent, label, emoji)
     lb.TextSize = 12
     lb.Font = Enum.Font.GothamSemibold
     lb.TextXAlignment = Enum.TextXAlignment.Left
-    
+
     local ct = Instance.new("TextLabel", f)
     ct.Size = UDim2.new(0.55, 0, 0, 14)
     ct.Position = UDim2.new(0, 12, 1, -18)
@@ -680,7 +730,7 @@ local function mkToggle(parent, label, emoji)
     ct.TextSize = 9
     ct.Font = Enum.Font.Gotham
     ct.TextXAlignment = Enum.TextXAlignment.Left
-    
+
     local st = Instance.new("TextLabel", f)
     st.Size = UDim2.new(0, 30, 0, 16)
     st.Position = UDim2.new(1, -96, 0.5, -8)
@@ -689,7 +739,7 @@ local function mkToggle(parent, label, emoji)
     st.TextColor3 = Color3.fromRGB(255, 80, 80)
     st.TextSize = 10
     st.Font = Enum.Font.GothamBold
-    
+
     local bt = Instance.new("TextButton", f)
     bt.Size = UDim2.new(0, 46, 0, 22)
     bt.Position = UDim2.new(1, -55, 0.5, -11)
@@ -697,14 +747,14 @@ local function mkToggle(parent, label, emoji)
     bt.Text = ""
     bt.BorderSizePixel = 0
     Instance.new("UICorner", bt).CornerRadius = UDim.new(1, 0)
-    
+
     local ci = Instance.new("Frame", bt)
     ci.Size = UDim2.new(0, 18, 0, 18)
     ci.Position = UDim2.new(0, 2, 0.5, -9)
     ci.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
     ci.BorderSizePixel = 0
     Instance.new("UICorner", ci).CornerRadius = UDim.new(1, 0)
-    
+
     local state = {value = false}
     local function setState(v)
         state.value = v
@@ -720,7 +770,7 @@ local function mkToggle(parent, label, emoji)
             st.Text = "OFF" st.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
     end
-    
+
     return {frame=f, button=bt, status=st, count=ct, setState=setState, getState=function() return state.value end}
 end
 
@@ -792,7 +842,7 @@ local function mkDropdown(parent, label, emoji, options, callback)
     f.ZIndex = 20
     f.LayoutOrder = nxtLO(parent)
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
-    
+
     local lb = Instance.new("TextLabel", f)
     lb.Size = UDim2.new(0, 50, 1, 0)
     lb.Position = UDim2.new(0, 10, 0, 0)
@@ -803,7 +853,7 @@ local function mkDropdown(parent, label, emoji, options, callback)
     lb.Font = Enum.Font.GothamBold
     lb.TextXAlignment = Enum.TextXAlignment.Left
     lb.ZIndex = 21
-    
+
     local db = Instance.new("TextButton", f)
     db.Size = UDim2.new(1, -75, 0, 26)
     db.Position = UDim2.new(0, 60, 0.5, -13)
@@ -817,7 +867,7 @@ local function mkDropdown(parent, label, emoji, options, callback)
     db.TextTruncate = Enum.TextTruncate.AtEnd
     Instance.new("UICorner", db).CornerRadius = UDim.new(0, 6)
     Instance.new("UIStroke", db).Color = Color3.fromRGB(100, 200, 255)
-    
+
     local dl = Instance.new("ScrollingFrame", f)
     dl.Size = UDim2.new(1, -75, 0, 0)
     dl.Position = UDim2.new(0, 60, 0, 34)
@@ -840,10 +890,10 @@ local function mkDropdown(parent, label, emoji, options, callback)
     dlP.PaddingBottom = UDim.new(0, 4)
     dlP.PaddingLeft = UDim.new(0, 4)
     dlP.PaddingRight = UDim.new(0, 4)
-    
+
     local isOpen = false
     local currentOpts = options or {}
-    
+
     local function refresh(newOpts)
         currentOpts = newOpts or currentOpts
         for _, c in pairs(dl:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
@@ -873,7 +923,7 @@ local function mkDropdown(parent, label, emoji, options, callback)
         end
     end
     refresh(currentOpts)
-    
+
     db.MouseButton1Click:Connect(function()
         isOpen = not isOpen
         if isOpen then
@@ -886,7 +936,7 @@ local function mkDropdown(parent, label, emoji, options, callback)
             dl.Visible = false
         end
     end)
-    
+
     return {frame=f, button=db, list=dl, refresh=refresh, setText=function(t) db.Text = t .. " ▼" end}
 end
 
@@ -921,12 +971,18 @@ end)
 UIS.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
-        MF.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y)
+        local vw, vh = getScreenSize()
+        local newX = startPos.X.Offset + delta.X
+        local newY = startPos.Y.Offset + delta.Y
+        -- Clamp drag agar tidak keluar layar
+        newX = math.clamp(newX, 0, math.max(0, vw - MF.AbsoluteSize.X))
+        newY = math.clamp(newY, 0, math.max(0, vh - MF.AbsoluteSize.Y))
+        MF.Position = UDim2.new(0, newX, 0, newY)
     end
 end)
 
 -- ============================================
--- RESIZE SYSTEM
+-- RESIZE SYSTEM (FIXED for Mobile)
 -- ============================================
 local resizing = false
 local rzStart, rzStartSize
@@ -936,9 +992,14 @@ resizeBtn.InputBegan:Connect(function(input)
         resizing = true
         rzStart = input.Position
         rzStartSize = MF.AbsoluteSize
+
+        -- Visual feedback
+        resizeBtn.BackgroundColor3 = Color3.fromRGB(120, 120, 200)
+
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 resizing = false
+                resizeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
                 CONFIG.sizeW = MF.AbsoluteSize.X
                 CONFIG.sizeH = MF.AbsoluteSize.Y
                 saveConfig()
@@ -950,8 +1011,20 @@ end)
 UIS.InputChanged:Connect(function(input)
     if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - rzStart
-        local newW = math.clamp(rzStartSize.X + delta.X, 260, 500)
-        local newH = math.clamp(rzStartSize.Y + delta.Y, 300, 700)
+        local vw, vh = getScreenSize()
+
+        -- Get UI position on screen
+        local posX = MF.AbsolutePosition.X
+        local posY = MF.AbsolutePosition.Y
+
+        -- Max width/height = jarak dari posisi UI ke tepi layar
+        local maxW = math.max(vw - posX - 10, 220)
+        local maxH = math.max(vh - posY - 10, 200)
+
+        -- Clamp: min 220x200, max = tidak melewati layar
+        local newW = math.clamp(rzStartSize.X + delta.X, 220, maxW)
+        local newH = math.clamp(rzStartSize.Y + delta.Y, 200, maxH)
+
         MF.Size = UDim2.new(0, newW, 0, newH)
     end
 end)
@@ -973,51 +1046,83 @@ saveBtn.MouseButton1Click:Connect(function()
     saveBtn.BackgroundColor3 = origColor
     saveBtn.Text = "💾"
 end)
--- ============================================
--- MINIMIZE BUTTON (FIXED)
--- ============================================
-local isMinimized = CONFIG.minimized or false
-local savedSize = nil -- will store size before minimize
 
-local function toggleMinimize()
-    isMinimized = not isMinimized
-    CONFIG.minimized = isMinimized
+-- ============================================
+-- MINIMIZE BUTTON (FIXED - proper collapse & expand)
+-- ============================================
+local isMinimized = false
+local savedFullSize = UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
 
-    if isMinimized then
-        -- Save current size before collapsing
-        savedSize = UDim2.new(0, MF.AbsoluteSize.X, 0, MF.AbsoluteSize.Y)
+local function applyMinimized(state, animate)
+    isMinimized = state
+    CONFIG.minimized = state
+
+    if state then
+        -- Save current size before minimize (only if currently expanded)
+        if MF.AbsoluteSize.Y > 45 then
+            savedFullSize = UDim2.new(0, MF.AbsoluteSize.X, 0, MF.AbsoluteSize.Y)
+        end
+
+        -- Hide content FIRST
         Content.Visible = false
         TabBar.Visible = false
-        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-            Size = UDim2.new(0, MF.AbsoluteSize.X, 0, 40)
-        }):Play()
+
+        -- Temporarily relax MIN size constraint for minimize
+        mfsz.MinSize = Vector2.new(220, 40)
+
+        -- Collapse to title bar only (40px height)
+        if animate then
+            TS:Create(MF, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {
+                Size = UDim2.new(0, MF.AbsoluteSize.X, 0, 40)
+            }):Play()
+        else
+            MF.Size = UDim2.new(0, MF.AbsoluteSize.X, 0, 40)
+        end
+
         minBtn.Text = "+"
     else
-        -- Restore to saved size
-        local restoreSize = savedSize or UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
-        TS:Create(MF, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-            Size = restoreSize
-        }):Play()
-        task.wait(0.3)
+        -- Restore normal size constraint
+        updateSizeConstraint()
+
+        -- Restore to saved size (but clamp to screen)
+        local vw, vh = getScreenSize()
+        local restoreW = math.min(savedFullSize.X.Offset, vw - 20)
+        local restoreH = math.min(savedFullSize.Y.Offset, vh - 40)
+        if restoreW < 220 then restoreW = 220 end
+        if restoreH < 200 then restoreH = 200 end
+        local restoreSize = UDim2.new(0, restoreW, 0, restoreH)
+
+        if animate then
+            TS:Create(MF, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {
+                Size = restoreSize
+            }):Play()
+            task.wait(0.25)
+        else
+            MF.Size = restoreSize
+        end
+
+        -- Show content AFTER expand
         Content.Visible = true
         TabBar.Visible = true
+
         minBtn.Text = "—"
     end
     saveConfig()
 end
 
-minBtn.MouseButton1Click:Connect(toggleMinimize)
+minBtn.MouseButton1Click:Connect(function()
+    applyMinimized(not isMinimized, true)
+end)
 
--- Apply minimized state on load
-if isMinimized then
-    savedSize = UDim2.new(0, CONFIG.sizeW, 0, CONFIG.sizeH)
-    Content.Visible = false
-    TabBar.Visible = false
-    MF.Size = UDim2.new(0, CONFIG.sizeW, 0, 40)
-    minBtn.Text = "+"
+-- Apply saved minimize state on load
+if CONFIG.minimized then
+    task.spawn(function()
+        task.wait(0.1)
+        applyMinimized(true, false)
+    end)
 end
 
-print("✅ v29 PART 2 UI Framework loaded!")
+print("✅ v29 PART 2 UI Framework loaded! (Fixed: Minimize, Resize, Responsive)")
 
 -- ============================================
 -- v29 PART 3 FIXED - ALL TABS
