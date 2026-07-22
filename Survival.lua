@@ -1494,8 +1494,7 @@ exploreStatus.TextWrapped = true
 exploreStatus.LayoutOrder = nxtLO(IslTab)
 
 -- ============================================
--- DEEP EXPLORE FUNCTION (FIXED)
--- Teleport player to each island → force streaming → scan special targets
+-- DEEP EXPLORE (FAST VERSION)
 -- ============================================
 local function deepExploreAllIslands(statusCallback)
     if S.exploring then return end
@@ -1509,13 +1508,21 @@ local function deepExploreAllIslands(statusCallback)
     -- Save original position
     local originalCF = hrp.CFrame
 
+    -- Freeze player during explore (anti fall damage)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local origPlatform = false
+    if hum then
+        origPlatform = hum.PlatformStand
+        hum.PlatformStand = true
+    end
+
     -- Step 1: Initial scan
-    if statusCallback then statusCallback("Step 1: Initial scan...") end
+    if statusCallback then statusCallback("Initial scan...") end
     scanIslands()
     scanSpecialTargets()
     autoCacheTargets()
 
-    -- Step 2: Collect all island positions (live + cached)
+    -- Step 2: Collect all island positions
     local visitList = {}
     local visited = {}
 
@@ -1532,7 +1539,6 @@ local function deepExploreAllIslands(statusCallback)
         end
     end
 
-    -- Also add cached islands not yet in live
     for name, data in pairs(S.cachedIslands) do
         if not visited[name] then
             local pos = type(data) == "table" and data.Position or data
@@ -1543,10 +1549,10 @@ local function deepExploreAllIslands(statusCallback)
         end
     end
 
-    -- Step 3: If no islands found at all, do grid scan first
+    -- Step 3: Grid scan if empty
     if #visitList == 0 then
-        if statusCallback then statusCallback("No islands found, grid scanning...") end
-        local step = 600
+        if statusCallback then statusCallback("Grid scanning...") end
+        local step = 800
         for x = -4000, 4000, step do
             for z = -4000, 4000, step do
                 if not S.exploring then break end
@@ -1555,13 +1561,12 @@ local function deepExploreAllIslands(statusCallback)
                 hrp = char:FindFirstChild("HumanoidRootPart")
                 if not hrp then break end
                 hrp.CFrame = CFrame.new(x, 300, z)
-                task.wait(0.3)
+                task.wait(0.15) -- FASTER
                 scanIslands()
                 autoCacheTargets()
             end
             if not S.exploring then break end
         end
-        -- Rebuild visit list after grid scan
         ic = workspace:FindFirstChild("IslandContainer")
         if ic then
             for _, isl in pairs(ic:GetChildren()) do
@@ -1576,69 +1581,60 @@ local function deepExploreAllIslands(statusCallback)
         end
     end
 
-    -- Step 4: DEEP VISIT - Teleport player to EACH island
-    -- This forces streaming to load children (Keys, NPCs, Tablets, Bosses)
+    -- Step 4: FAST VISIT - TP to each island
     local totalIslands = #visitList
     for i, info in ipairs(visitList) do
         if not S.exploring then break end
 
         if statusCallback then
-            statusCallback(string.format("Visiting %d/%d: %s...", i, totalIslands, info.name))
+            statusCallback(string.format("[%d/%d] %s", i, totalIslands, info.name))
         end
 
-        -- Teleport player near the island
         char = player.Character
         if not char then break end
         hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then break end
 
-        hrp.CFrame = CFrame.new(info.pos.X, info.pos.Y + 50, info.pos.Z)
-        task.wait(0.8) -- Wait for streaming to load island children
+        -- TP high above island (safer, faster streaming)
+        hrp.CFrame = CFrame.new(info.pos.X, info.pos.Y + 80, info.pos.Z)
+        task.wait(0.35) -- FASTER: 0.35 (was 0.8)
 
-        -- Now scan special targets (Keys, Survivors, Tablets, Bosses)
-        scanIslands()
+        -- Scan while at position
         scanSpecialTargets()
         autoCacheTargets()
 
-        -- Extra: walk around the island slightly to trigger more streaming
-        for offset = 1, 3 do
-            if not S.exploring then break end
-            char = player.Character
-            if not char then break end
-            hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then break end
-
-            local offsets = {
-                Vector3.new(40, 20, 0),
-                Vector3.new(-40, 20, 0),
-                Vector3.new(0, 20, 40),
-            }
-            hrp.CFrame = CFrame.new(info.pos + offsets[offset])
-            task.wait(0.4)
+        -- Quick jitter (1 offset only, not 3) to catch stragglers
+        if i % 2 == 0 then -- only every 2nd island
+            hrp.CFrame = CFrame.new(info.pos.X + 30, info.pos.Y + 30, info.pos.Z + 30)
+            task.wait(0.2)
             scanSpecialTargets()
             autoCacheTargets()
         end
     end
 
-    -- Step 5: Return player to original position
+    -- Step 5: Return player
     char = player.Character
     if char then
         hrp = char:FindFirstChild("HumanoidRootPart")
         if hrp then
             hrp.CFrame = originalCF
         end
+        if hum then
+            hum.PlatformStand = origPlatform
+        end
     end
 
     S.exploring = false
 
     if statusCallback then
+        local ci=0 for _ in pairs(S.cachedIslands) do ci=ci+1 end
+        local ck=0 for _ in pairs(S.cachedKeys) do ck=ck+1 end
+        local cs=0 for _ in pairs(S.cachedSurv) do cs=cs+1 end
+        local ct=0 for _ in pairs(S.cachedTab) do ct=ct+1 end
+        local cb=0 for _ in pairs(S.cachedBoss) do cb=cb+1 end
         statusCallback(string.format(
             "✅ Done! 🏝️%d 🗝️%d 🧑%d 📜%d 👹%d",
-            #S.ILIST + (function() local c=0 for _ in pairs(S.cachedIslands) do c=c+1 end return c end)(),
-            #S.keysList + (function() local c=0 for _ in pairs(S.cachedKeys) do c=c+1 end return c end)(),
-            #S.survList + (function() local c=0 for _ in pairs(S.cachedSurv) do c=c+1 end return c end)(),
-            #S.tabList + (function() local c=0 for _ in pairs(S.cachedTab) do c=c+1 end return c end)(),
-            #S.bossList + (function() local c=0 for _ in pairs(S.cachedBoss) do c=c+1 end return c end)()
+            ci, ck, cs, ct, cb
         ))
     end
 end
